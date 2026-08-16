@@ -32,6 +32,8 @@ Roles are not included by default.
 
 Asgardeo prefixes role names by where they are managed — `Internal/everyone`, `Application/HR`. The backend strips everything before the last `/` and matches the remainder case-insensitively against its `Role` enum, ignoring anything that does not match (`Internal/everyone` is discarded harmlessly).
 
+This tenant advertises **both** a `roles` claim and an `application_roles` claim; which one is populated depends on the application's user-attribute configuration. The backend reads both, so a console change cannot silently stop roles being seen.
+
 ## 3. Create the roles
 
 **User Management → Roles** → create, with audience **Application → Altrium**:
@@ -50,19 +52,26 @@ A user who exists in Asgardeo but not in `app_user` authenticates successfully a
 
 ## 5. Wire up the backend
 
-The backend needs only the issuer — it holds no client secret and validates signatures against the tenant's JWKS endpoint, which Spring discovers from the issuer.
+**Our tenant is `pasindudilshan`**, and its endpoints are confirmed live:
+
+| | |
+|---|---|
+| Issuer | `https://api.asgardeo.io/t/pasindudilshan/oauth2/token` |
+| JWKS | `https://api.asgardeo.io/t/pasindudilshan/oauth2/jwks` |
+| Authorize | `https://api.asgardeo.io/t/pasindudilshan/oauth2/authorize` |
+| End session | `https://api.asgardeo.io/t/pasindudilshan/oidc/logout` |
+
+The issuer is a public identifier, not a credential, so it is committed as the default in `application.yml` and the backend starts with no extra configuration. Override only to point at a different tenant:
 
 ```powershell
-$env:ASGARDEO_ISSUER_URI = 'https://api.asgardeo.io/t/<tenant>/oauth2/token'
+$env:ASGARDEO_ISSUER_URI = 'https://api.asgardeo.io/t/<other-tenant>/oauth2/token'
 ```
 
-Replace `<tenant>` with the tenant name from the console. Verify discovery works:
+The backend holds **no client secret**. It fetches signing keys from `jwks_uri`, which Spring discovers from the issuer. Re-check discovery any time login breaks:
 
 ```powershell
-curl https://api.asgardeo.io/t/<tenant>/oauth2/token/.well-known/openid-configuration
+Invoke-RestMethod https://api.asgardeo.io/t/pasindudilshan/oauth2/token/.well-known/openid-configuration
 ```
-
-`jwks_uri` in that document is what the backend fetches signing keys from.
 
 ## 6. Frontend (Sprint 1, after the backend)
 
@@ -72,12 +81,12 @@ curl https://api.asgardeo.io/t/<tenant>/oauth2/token/.well-known/openid-configur
 
 ## What to hand over
 
-| Value | Where it comes from | Used by |
+| Value | Status | Used by |
 |---|---|---|
-| Tenant name | Console URL | Both |
-| Issuer URI | `https://api.asgardeo.io/t/<tenant>/oauth2/token` | Backend (`ASGARDEO_ISSUER_URI`) |
-| Client ID | Applications → Altrium → Protocol | Frontend only |
-| Each user's `sub` | User Management → Users → Profile | `app_user.asgardeo_subject` |
+| Tenant name | ✅ `pasindudilshan` | Both |
+| Issuer URI | ✅ committed as the default | Backend |
+| Client ID | **still needed** — Applications → Altrium → Protocol | Frontend only |
+| Each user's `sub` | **still needed** — User Management → Users → Profile → User ID | `app_user.asgardeo_subject` |
 
 No client secret is needed anywhere. If you find yourself copying one, the application type is wrong.
 

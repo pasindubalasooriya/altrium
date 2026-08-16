@@ -47,8 +47,13 @@ public class AltriumJwtAuthenticationConverter
     private static final Logger log =
             LoggerFactory.getLogger(AltriumJwtAuthenticationConverter.class);
 
-    /** Asgardeo emits roles under this claim once the application is configured to do so. */
-    private static final String ROLES_CLAIM = "roles";
+    /**
+     * Asgardeo advertises both claims: {@code roles} for tenant-level roles and
+     * {@code application_roles} for roles scoped to this application. Which one appears
+     * depends on how the application's user attributes are configured, so read both rather
+     * than depending on a console setting staying put.
+     */
+    private static final List<String> ROLE_CLAIMS = List.of("roles", "application_roles");
 
     /**
      * Asgardeo prefixes internally-managed roles, e.g. {@code Internal/everyone} or
@@ -114,27 +119,30 @@ public class AltriumJwtAuthenticationConverter
     }
 
     private Set<Role> rolesFromToken(Jwt jwt) {
-        Object claim = jwt.getClaim(ROLES_CLAIM);
-        if (!(claim instanceof Collection<?> raw)) {
-            return EnumSet.noneOf(Role.class);
-        }
         Set<Role> parsed = EnumSet.noneOf(Role.class);
-        for (Object value : raw) {
-            if (value == null) {
-                continue;
-            }
-            String name = value.toString();
-            int separator = name.lastIndexOf(ROLE_SEPARATOR);
-            if (separator >= 0) {
-                name = name.substring(separator + 1);
-            }
-            try {
-                parsed.add(Role.valueOf(name.trim().toUpperCase(Locale.ROOT).replace('-', '_')));
-            } catch (IllegalArgumentException ignored) {
-                // Asgardeo ships built-in roles such as Internal/everyone that mean nothing here.
+        for (String claimName : ROLE_CLAIMS) {
+            if (jwt.getClaim(claimName) instanceof Collection<?> raw) {
+                raw.forEach(value -> parseRole(value).ifPresent(parsed::add));
             }
         }
         return parsed;
+    }
+
+    private Optional<Role> parseRole(Object value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        String name = value.toString();
+        int separator = name.lastIndexOf(ROLE_SEPARATOR);
+        if (separator >= 0) {
+            name = name.substring(separator + 1);
+        }
+        try {
+            return Optional.of(Role.valueOf(name.trim().toUpperCase(Locale.ROOT).replace('-', '_')));
+        } catch (IllegalArgumentException ignored) {
+            // Asgardeo ships built-in roles such as Internal/everyone that mean nothing here.
+            return Optional.empty();
+        }
     }
 
     /**
