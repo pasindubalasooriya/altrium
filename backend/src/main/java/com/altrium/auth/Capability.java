@@ -34,6 +34,17 @@ public enum Capability {
 
     // ---- Reviews (P-3) ----------------------------------------------------------------
 
+    /**
+     * Seeing that a person is under review this cycle, and how far along they are — the
+     * roster behind "view permitted reviews", with no review content in it.
+     *
+     * <p>Its grounds are the union of the three read capabilities below, which is not a
+     * coincidence to be relied on: a caller who may read nothing about a subject must not
+     * learn that the subject is being reviewed at all, so the roster is exactly as wide as
+     * the content behind it and no wider.
+     */
+    READ_REVIEW_SUMMARY(Kind.ARTIFACT, "P-0.3", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
+
     /** Written by S; read by S, {@code mgr(S)} and HR-in-scope. Carries no rating field. */
     READ_SELF_REVIEW(Kind.ARTIFACT, "P-3.1", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
     WRITE_SELF_REVIEW(Kind.ARTIFACT, "P-3.1", SELF),
