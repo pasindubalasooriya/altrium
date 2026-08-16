@@ -1,0 +1,42 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+dependency-reduced-pom.xml
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Environment & secrets — never commit Asgardeo client secrets or DB passwords
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+*.pem
+*.p12
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+!.vscode/extensions.json
+.settings/
+.project
+.classpath
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
