@@ -57,11 +57,11 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | # | Artifact | Policy |
 |---|---|---|
 | **P-3.1** | Self-review | Written by S only. Readable by S, `mgr(S)`, HR-in-scope. No rating field exists on it at all. |
-| **P-3.2** | Peer review | Readable by `mgr(S)` and HR-in-scope, **including author identity**. |
+| **P-3.2** | Peer review | Readable by `mgr(S)` and HR-in-scope, **including author identity**. Where S is themselves a manager, `mgr(S)` is the manager's manager — the same rule one level up, not a separate mechanism (scenario §7). |
 | **P-3.3** | Peer review — anonymity | **S may never receive peer text, peer rating, peer author, or peer count** — through any endpoint, aggregate, sort order, pagination count or error message. Structural, not conditional: the subject-scoped query never joins the peer table. |
 | **P-3.4** | Peer review — write | Only the two assigned peers may write, only for their assigned S, only while the cycle is open. |
-| **P-3.5** | Peer review — single submission | Once submitted, immutable (scenario §15.2). A second submission is refused, backed by a unique constraint on `(cycle_id, subject_id, peer_id)`. *Status code pending confirmation: proposed **409**, since the peer has permission and it is the state that forbids the write; P-0.5's 403 rule governs access denials.* |
-| **P-3.6** | Peer assignment | Exactly **two**, chosen by `mgr(S)` from active users; cross-department allowed (§5). Excluded: S themselves, and — *pending confirmation* — `mgr(S)`, who already writes the manager review. Scenario §7's allowance for same-level managers or the manager's own reports is unaffected. |
+| **P-3.5** | Peer review — single submission | Once submitted, immutable (scenario §15.2). A second submission is refused with **409**, backed by a unique constraint on `(cycle_id, subject_id, peer_id)`. 409 rather than 403 because the peer *has* permission and it is the state that forbids the write; P-0.5's 403 rule governs **access** denials. |
+| **P-3.6** | Peer assignment | Exactly **two**, chosen by `mgr(S)` from active users; cross-department allowed (§5). **Excluded: S themselves, and `mgr(S)`** — a manager is never a peer reviewer of their own report, since they already write the manager review. Scenario §7's allowance for a manager-reviewee's peers to be same-level managers or their own reports is unaffected. |
 | **P-3.7** | Manager review | Written by `mgr(S)` only. Readable by S, `mgr(S)`, HR-in-scope. |
 
 ## P-4 Ratings
@@ -140,6 +140,7 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | Leadership requests an individual review | P-7.1 | 403 |
 | Leadership is made a reviewee | P-1.5, P-7.2 | rejected at creation |
 | Super Admin requests review content | P-9.4 | 403 |
-| Peer submits twice | P-3.5 | 409 (pending) |
+| Peer submits twice | P-3.5 | 409 |
+| Manager is assigned as their own report's peer | P-3.6 | rejected at assignment |
 
 **Correctness tests alongside:** sweep is idempotent (run twice, one cycle opened) · a past-dated cycle opens on the next sweep · a suspended PDP resumes with goals and progress intact · the exclusivity invariant holds under two concurrent open-PIP requests, against real MySQL · a reporting-line loop is rejected.
