@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    # Real MySQL, not H2. An in-memory substitute would let Flyway migrations and the
+    # database-level constraints (notably the plan-exclusivity invariant, P-5.7) pass
+    # silently without ever being exercised.
+    url: ${ALTRIUM_TEST_DB_URL:jdbc:mysql://localhost:3306/altrium_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${ALTRIUM_DB_USER:altrium}
+    password: ${ALTRIUM_DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # No Asgardeo tenant is contacted in tests. A stub JwtDecoder stands in, so the real
+  # filter chain and the real AltriumJwtAuthenticationConverter still run — which is the
+  # point: denial tests must exercise the actual security path, not a mock of it.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri:
+
+logging:
+  level:
+    com.altrium: DEBUG
