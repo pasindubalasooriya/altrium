@@ -47,6 +47,35 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
     @EntityGraph(attributePaths = {"department", "manager"})
     Page<AppUser> findAll(Specification<AppUser> spec, Pageable pageable);
 
+    /**
+     * Loads everything an authorization decision needs about a reviewee — roles for P-1.5,
+     * department for P-2.1, manager for P-1.1 — in one query.
+     *
+     * <p>Join fetching is safe here because this returns a single row, not a page. It is
+     * also necessary: the decision runs outside any transaction the caller may have opened,
+     * and a lazy association would fail there rather than deny cleanly.
+     *
+     * <p>No {@code active} filter. A deactivated person's history stays readable to whoever
+     * could read it (P-0.7), so their artifacts must still resolve a subject.
+     */
+    @Query("""
+            SELECT u FROM AppUser u
+            LEFT JOIN FETCH u.roles
+            LEFT JOIN FETCH u.department
+            LEFT JOIN FETCH u.manager
+            WHERE u.id = :id
+            """)
+    Optional<AppUser> findByIdForAuthorization(@Param("id") Long id);
+
+    /**
+     * The ids a manager's queries carry in their {@code WHERE} clause (P-0.3, P-1.1).
+     *
+     * <p>Ids only, not entities: this runs on every scoped list request, and the decision
+     * needs nothing else about those people.
+     */
+    @Query("SELECT u.id FROM AppUser u WHERE u.manager.id = :managerId")
+    List<Long> findIdsByManagerId(@Param("managerId") Long managerId);
+
     Optional<AppUser> findByEmail(String email);
 
     boolean existsByAsgardeoSubject(String asgardeoSubject);

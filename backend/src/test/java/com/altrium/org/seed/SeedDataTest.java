@@ -2,6 +2,8 @@ package com.altrium.org.seed;
 
 import com.altrium.org.AppUser;
 import com.altrium.org.AppUserRepository;
+import com.altrium.org.HrDepartmentGrantRepository;
+import com.altrium.org.HrGrantService;
 import com.altrium.org.OrgService;
 import com.altrium.org.Role;
 import com.altrium.testsupport.StubJwtDecoderConfig;
@@ -37,11 +39,17 @@ class SeedDataTest {
     @Autowired
     private AppUserRepository users;
 
+    @Autowired
+    private HrGrantService hrGrants;
+
+    @Autowired
+    private HrDepartmentGrantRepository grantRepository;
+
     private SeedData seed;
 
     @BeforeEach
     void setUp() {
-        seed = new SeedData(org, users);
+        seed = new SeedData(org, users, hrGrants, grantRepository);
         seed.run(null);
     }
 
