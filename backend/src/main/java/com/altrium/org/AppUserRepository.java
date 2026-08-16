@@ -1,12 +1,20 @@
 package com.altrium.org;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
-public interface AppUserRepository extends JpaRepository<AppUser, Long> {
+/**
+ * {@link JpaSpecificationExecutor} is what lets scope filters be pushed into the generated
+ * SQL rather than applied afterwards in Java (P-0.3). Filtering a fetched list would still
+ * leak through pagination counts, which report what the query matched, not what survived.
+ */
+public interface AppUserRepository extends JpaRepository<AppUser, Long>,
+        JpaSpecificationExecutor<AppUser> {
 
     /**
      * Resolves a validated JWT to the person it belongs to, fetching roles in the same query
@@ -26,4 +34,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByEmail(String email);
 
     boolean existsByAsgardeoSubject(String asgardeoSubject);
+
+    boolean existsByEmail(String email);
+
+    /**
+     * Direct reports only (P-1.1) — never transitive. The whole manager side of the
+     * authorization model is built on this one relationship.
+     */
+    List<AppUser> findByManagerId(Long managerId);
+
+    long countByManagerId(Long managerId);
 }

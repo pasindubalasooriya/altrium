@@ -36,6 +36,46 @@ public class ApiExceptionHandler {
         return denied();
     }
 
+    /**
+     * 409, not 403: the caller has permission, but the request conflicts with what is
+     * already recorded. Answering 403 would hide a data problem behind a security-shaped
+     * response and mislead a legitimate caller about their own permissions.
+     */
+    @ExceptionHandler(ConflictApiException.class)
+    public ProblemDetail onConflict(ConflictApiException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setTitle("Conflict");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    /**
+     * 400. The message is safe to return: it describes the org structure the caller is
+     * already editing, not anything confidential.
+     */
+    @ExceptionHandler(ValidationApiException.class)
+    public ProblemDetail onValidation(ValidationApiException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid request");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    /**
+     * A resource the caller may legitimately address but which does not exist.
+     *
+     * <p>Note this is only ever reached for resources the caller is already entitled to see.
+     * Anything scoped away by the authorization layer must 403 instead, never 404, or the
+     * difference between the two becomes a way to enumerate what exists (P-0.5).
+     */
+    @ExceptionHandler(NotFoundApiException.class)
+    public ProblemDetail onNotFound(NotFoundApiException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problem.setTitle("Not found");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
     private ProblemDetail denied() {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
         problem.setTitle(DENIED);

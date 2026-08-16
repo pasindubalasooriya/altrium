@@ -75,7 +75,17 @@ Invoke-RestMethod https://api.asgardeo.io/t/pasindudilshan/oauth2/token/.well-kn
 
 ## 6. Frontend (Sprint 1, after the backend)
 
-`@asgardeo/auth-react`, configured with the tenant, the client ID from step 1, and `scope: ["openid", "profile", "roles"]`.
+`@asgardeo/auth-react`, configured as:
+
+```ts
+{
+  signInRedirectURL: "http://localhost:5173",
+  signOutRedirectURL: "http://localhost:5173",
+  clientID: "4fnWPKRrxnUyy4wxULpkw4nOhnoa",
+  baseUrl: "https://api.asgardeo.io/t/pasindudilshan",
+  scope: ["openid", "profile", "roles"]
+}
+```
 
 **Logout must call the end-session endpoint**, not merely clear local tokens. Clearing tokens leaves the Asgardeo session alive, so the next login silently reuses it and the user appears unable to sign out.
 
@@ -85,8 +95,10 @@ Invoke-RestMethod https://api.asgardeo.io/t/pasindudilshan/oauth2/token/.well-kn
 |---|---|---|
 | Tenant name | ✅ `pasindudilshan` | Both |
 | Issuer URI | ✅ committed as the default | Backend |
-| Client ID | **still needed** — Applications → Altrium → Protocol | Frontend only |
+| Client ID | ✅ `4fnWPKRrxnUyy4wxULpkw4nOhnoa` | Frontend only |
 | Each user's `sub` | **still needed** — User Management → Users → Profile → User ID | `app_user.asgardeo_subject` |
+
+The client ID is a **public identifier, not a credential**. A PKCE single-page app has no client secret precisely because anything shipped in a browser bundle is readable, so committing it is correct and changes nothing about security. If anyone hands you a client *secret* for this application, the application type has been changed to the wrong kind — go back to step 1.
 
 No client secret is needed anywhere. If you find yourself copying one, the application type is wrong.
 

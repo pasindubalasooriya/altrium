@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -85,6 +86,10 @@ public class AppUser {
     @CollectionTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", nullable = false, length = 32)
     @Enumerated(EnumType.STRING)
+    // Batched so listing a page of users costs a handful of queries rather than one per row.
+    // A join fetch is not an option here: it would force Hibernate to paginate in memory,
+    // which breaks the rule that nothing may be hardcoded to organisational size.
+    @BatchSize(size = 50)
     private Set<Role> roles = EnumSet.noneOf(Role.class);
 
     @Column(name = "created_at", insertable = false, updatable = false)
