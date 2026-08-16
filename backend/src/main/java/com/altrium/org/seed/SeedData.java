@@ -3,6 +3,8 @@ package com.altrium.org.seed;
 import com.altrium.org.AppUser;
 import com.altrium.org.AppUserRepository;
 import com.altrium.org.Department;
+import com.altrium.org.HrDepartmentGrantRepository;
+import com.altrium.org.HrGrantService;
 import com.altrium.org.OrgService;
 import com.altrium.org.Role;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -54,22 +57,37 @@ public class SeedData implements ApplicationRunner {
 
     private final OrgService org;
     private final AppUserRepository users;
+    private final HrGrantService hrGrants;
+    private final HrDepartmentGrantRepository grantRepository;
 
     private final Map<String, Long> people = new HashMap<>();
+    private final Map<String, Long> departmentIds = new HashMap<>();
 
-    public SeedData(OrgService org, AppUserRepository users) {
+    public SeedData(OrgService org,
+                    AppUserRepository users,
+                    HrGrantService hrGrants,
+                    HrDepartmentGrantRepository grantRepository) {
         this.org = org;
         this.users = users;
+        this.hrGrants = hrGrants;
+        this.grantRepository = grantRepository;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        // The two halves are guarded separately so an existing organisation can still gain
+        // its HR grants — the grants arrived a feature later than the people did.
         if (users.existsByAsgardeoSubject(SUB_RICHARD)) {
-            log.info("Seed data already present; skipping.");
-            return;
+            log.info("Sample organisation already present; skipping people.");
+            loadExistingIds();
+        } else {
+            seedPeople();
         }
+        seedHrGrants();
+    }
 
+    private void seedPeople() {
         log.info("Seeding sample organisation...");
 
         Long engineering = department("Engineering");
@@ -139,8 +157,61 @@ public class SeedData implements ApplicationRunner {
         log.info("Seeded {} people across 4 departments.", people.size());
     }
 
+    /**
+     * The HR grants that make the scoping rules demonstrable.
+     *
+     * <p>Guarded separately from the people, so an organisation seeded before this feature
+     * existed still picks them up on the next run.
+     */
+    private void seedHrGrants() {
+        if (grantRepository.count() > 0) {
+            log.info("HR department grants already present; skipping.");
+            return;
+        }
+
+        Long kevin = people.get("kevin");
+        Long hana = people.get("hana");
+        Long rosa = people.get("rosa");
+        if (kevin == null || hana == null || rosa == null) {
+            log.warn("HR users not found; skipping HR grants.");
+            return;
+        }
+
+        Long engineering = departmentIds.get("Engineering");
+        Long sales = departmentIds.get("Sales");
+        Long finance = departmentIds.get("Finance");
+        Long peopleOps = departmentIds.get("People Operations");
+
+        // Kevin is the HR Head: an explicit grant over his own department (P-2.4), which is
+        // how People Operations' reviews get overseen at all. It still leaves his own review
+        // out of reach (P-2.2) — that block has no override.
+        hrGrants.grant(kevin, peopleOps, true, null, g -> g.getId());
+
+        // Hana oversees two departments, neither of them her own. The ordinary case.
+        hrGrants.grant(hana, engineering, false, null, g -> g.getId());
+        hrGrants.grant(hana, sales, false, null, g -> g.getId());
+
+        // Rosa is granted Finance plus her own department, without the explicit flag. People
+        // Operations is therefore excluded from her scope, which makes the difference between
+        // a plain grant and an explicit one visible side by side with Kevin.
+        hrGrants.grant(rosa, finance, false, null, g -> g.getId());
+        hrGrants.grant(rosa, peopleOps, false, null, g -> g.getId());
+
+        log.info("Seeded HR department grants.");
+    }
+
+    /** Re-reads ids for an organisation seeded on an earlier run. */
+    private void loadExistingIds() {
+        org.listDepartments().forEach(d -> departmentIds.put(d.getName(), d.getId()));
+        for (String handle : List.of("kevin", "hana", "rosa")) {
+            users.findByEmail(handle + "@altrium.test")
+                    .ifPresent(user -> people.put(handle, user.getId()));
+        }
+    }
+
     private Long department(String name) {
         Department department = org.createDepartment(name);
+        departmentIds.put(name, department.getId());
         return department.getId();
     }
 
