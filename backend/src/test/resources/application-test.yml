@@ -17,14 +17,16 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-  # No Asgardeo tenant is contacted in tests. A stub JwtDecoder stands in, so the real
-  # filter chain and the real AltriumJwtAuthenticationConverter still run — which is the
-  # point: denial tests must exercise the actual security path, not a mock of it.
+# No Asgardeo tenant is contacted in tests. A stub JwtDecoder stands in, so the real filter
+# chain and the real AltriumJwtAuthenticationConverter still run — which is the point:
+# denial tests must exercise the actual security path, not a mock of it.
+#
+# The real decoder is switched off explicitly. Omitting issuer-uri here would not work: a
+# profile file layers over application.yml rather than replacing it, so the tenant default
+# stays visible and the real decoder would be built and collide with the stub.
+altrium:
   security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri:
+    asgardeo-decoder: false
 
 logging:
   level:

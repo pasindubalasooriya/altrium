@@ -1,6 +1,5 @@
 package com.altrium.web.admin;
 
-import com.altrium.org.AppUser;
 import com.altrium.org.OrgService;
 import com.altrium.org.Role;
 import com.altrium.web.admin.OrgDtos.CreateUserRequest;
@@ -65,13 +64,16 @@ public class UserAdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
 
-        Page<AppUser> result = org.listUsers(search, departmentId, active,
+        // The mapper is handed to the service so conversion happens inside its transaction.
+        // Mapping entities out here would touch lazy proxies on a closed session.
+        Page<UserView> result = org.listUsers(search, departmentId, active,
                 PageRequest.of(Math.max(page, 0),
                         Math.clamp(size, 1, MAX_PAGE_SIZE),
-                        Sort.by("fullName").ascending()));
+                        Sort.by("fullName").ascending()),
+                UserView::of);
 
         return new PageView<>(
-                result.getContent().stream().map(UserView::of).toList(),
+                result.getContent(),
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
@@ -80,13 +82,13 @@ public class UserAdminController {
 
     @GetMapping("/{id}")
     public UserView get(@PathVariable Long id) {
-        return UserView.of(org.get(id));
+        return org.get(id, UserView::of);
     }
 
     @GetMapping("/{id}/direct-reports")
     @Operation(summary = "Direct reports only — never transitive (P-1.1)")
     public java.util.List<UserView> directReports(@PathVariable Long id) {
-        return org.directReports(id).stream().map(UserView::of).toList();
+        return org.directReports(id, UserView::of);
     }
 
     @PostMapping

@@ -1,5 +1,9 @@
 package com.altrium.org;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -30,6 +34,18 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
             WHERE u.asgardeoSubject = :subject
             """)
     Optional<AppUser> findByAsgardeoSubjectWithRoles(@Param("subject") String subject);
+
+    /**
+     * Both to-one associations are fetched with the page, because the user console shows the
+     * department and manager name on every row. Without this each row triggers its own
+     * query, which is invisible at 31 people and quietly quadratic later.
+     *
+     * <p>Only to-one associations belong here. Adding the roles collection would force
+     * Hibernate to paginate in memory; roles are batch-fetched instead.
+     */
+    @Override
+    @EntityGraph(attributePaths = {"department", "manager"})
+    Page<AppUser> findAll(Specification<AppUser> spec, Pageable pageable);
 
     Optional<AppUser> findByEmail(String email);
 

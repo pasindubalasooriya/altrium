@@ -15,6 +15,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Organisational structure: people, departments and reporting lines (feature 2).
@@ -153,22 +154,35 @@ public class OrgService {
     }
 
     /**
-     * A page of users, filtered in SQL.
+     * A page of users, filtered in SQL and mapped to a response shape.
      *
      * <p>Never loads the organisation into memory: nothing may be hardcoded to
      * organisational size, and a console that works at 100 people by fetching everything
      * stops working the moment it grows.
+     *
+     * <p>The caller passes the mapper rather than receiving entities, so the conversion runs
+     * <em>inside</em> this transaction. Returning entities instead would hand the controller
+     * lazy proxies belonging to a closed session — which fails only outside a transaction,
+     * meaning tests that wrap themselves in one would never see it.
      */
     @Transactional(readOnly = true)
-    public Page<AppUser> listUsers(String search, Long departmentId, Boolean active, Pageable pageable) {
-        return users.findAll(userFilter(search, departmentId, active), pageable);
+    public <T> Page<T> listUsers(String search, Long departmentId, Boolean active,
+                                 Pageable pageable, Function<AppUser, T> mapper) {
+        return users.findAll(userFilter(search, departmentId, active), pageable).map(mapper);
     }
 
     @Transactional(readOnly = true)
-    public AppUser get(Long id) {
-        return requireUser(id);
+    public <T> T get(Long id, Function<AppUser, T> mapper) {
+        return mapper.apply(requireUser(id));
     }
 
+    /** Direct reports only (P-1.1) — never transitive. */
+    @Transactional(readOnly = true)
+    public <T> List<T> directReports(Long managerId, Function<AppUser, T> mapper) {
+        return users.findByManagerId(managerId).stream().map(mapper).toList();
+    }
+
+    /** Entity-returning variant for callers already inside a transaction, such as tests. */
     @Transactional(readOnly = true)
     public List<AppUser> directReports(Long managerId) {
         return users.findByManagerId(managerId);
