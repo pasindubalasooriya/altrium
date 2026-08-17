@@ -141,6 +141,22 @@ public enum Capability {
     OPEN_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.7", DIRECT_MANAGER),
 
     /**
+     * Drafting the plan: its goals and its consequence clause.
+     *
+     * <p>{@link Grounds#SELF} is absent, which is the difference between the two instruments. A
+     * development plan is written <em>with</em> the employee and they hold
+     * {@link #WRITE_DEVELOPMENT_PLAN}; an improvement plan is put <em>to</em> them, and an
+     * employee who could edit their own consequence clause would be able to soften it.
+     */
+    WRITE_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.3", DIRECT_MANAGER),
+
+    /**
+     * Passing or failing the plan (P-5.7). {@code mgr(S)}, who judges whether the goals were
+     * met, exactly as they approve the individual goals under P-5.2.
+     */
+    CLOSE_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.7", DIRECT_MANAGER),
+
+    /**
      * Co-signing and recording the witness are HR-only (P-5.4). The manager who opened the
      * PIP can do neither, and that separation is the entire point of the formality objects.
      */

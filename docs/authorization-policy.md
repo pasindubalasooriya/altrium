@@ -91,7 +91,11 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-5.9** | The PDP is **not keyed to a cycle**. One enduring row per employee, unique on `user_id`, materialised the first time anybody asks for it. That is what makes §8's "from the moment they join" and §5 step 9's "resumes the suspended development plan with its goals and progress intact" the same fact - a per-cycle plan would make carry-over a copy, and a copy is where progress gets lost. |
 | **P-5.10** | An approved goal is frozen: it cannot be edited or removed until `mgr(S)` reopens it (409). Reopening is gated on `APPROVE_GOAL`, the same authority that granted the approval, so the two cannot drift apart. |
 | **P-5.6** | A PIP must carry non-empty consequence-clause text before it can be co-signed. |
-| **P-5.7** | **Exclusivity invariant.** No employee holds an ACTIVE PDP and an ACTIVE PIP simultaneously. Enforced in `PlanService` **and** by a database constraint, so concurrent requests cannot both slip through. |
+| **P-5.7** | **Exclusivity invariant.** No employee holds an ACTIVE PDP and an ACTIVE PIP simultaneously. Enforced in `PlanService` **and** by a database constraint: `improvement_plan.active_user_id` is a stored generated column holding `user_id` only while the plan is ACTIVE, carrying a unique index. MySQL treats NULLs as distinct, so any number of closed plans coexist and a second ACTIVE one cannot be inserted at all. Opening suspends the PDP in the **same transaction**; passing or failing resumes that **same row**, goals and progress intact. |
+| **P-5.11** | An improvement plan is written **to** the employee, not with them. `WRITE_IMPROVEMENT_PLAN` carries `DIRECT_MANAGER` only - no `SELF`, unlike `WRITE_DEVELOPMENT_PLAN`. An employee able to edit their own consequence clause could soften it. |
+| **P-5.12** | A plan that was never co-signed **cannot be passed or failed** (409): the employee never saw it, so no outcome may be recorded against it. A plan can only be **failed once its deadline has passed** - the literal reading of "deadlines missed", and the protection the fixed deadline exists to give. |
+| **P-5.13** | The consequence clause is fixed once co-signed (409). It is what the employee accepted; changing it afterwards would make the signature meaningless. |
+| **P-5.14** | **Failing also resumes the development plan.**<br><br>*A judgment call, not a rule from the documents: §5 step 9 only says a passed plan resumes it. Leaving it suspended would leave the employee holding no active plan at all, contradicting §8's universal development plan. A failed PIP records an outcome; it does not end somebody's development.* |
 | **P-5.8** | Only `PlanService` mutates plan status. No controller or repository writes a status field. |
 
 ## P-6 Cycles and configuration
@@ -152,7 +156,16 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | HR grant revoked mid-session, next request with the same token | P-2.5 | 403, no re-login |
 | Subject reads a PIP before co-sign | P-5.3 | 403 |
 | Manager attempts co-sign or witness | P-5.4 | 403 |
-| Any actor extends a PIP deadline | P-5.5 | 403 |
+| Any actor extends a PIP deadline - manager, HR, Super Admin, subject | P-5.5 | 403 |
+| Any actor moves a target date on a PIP **goal** | P-5.5 | 403 |
+| Employee writes a goal or consequence clause on their own PIP | P-5.11 | 403 |
+| HR or another manager opens a PIP | P-1.2, P-5.7 | 403 |
+| PIP co-signed with no consequence clause | P-5.6 | 400 |
+| Consequence clause edited after co-signing | P-5.13 | 409 |
+| Second PIP opened for the same employee, including concurrently | P-5.7 | 409, one row |
+| Goal added to a suspended PDP | P-5.7 | 409 |
+| PIP passed with goals outstanding, or closed before co-signing | P-5.12 | 409 |
+| PIP failed before its deadline | P-5.12 | 409 |
 | Leadership requests an individual review | P-7.1 | 403 |
 | Leadership is made a reviewee | P-1.5, P-7.2 | rejected at creation |
 | Super Admin requests review content, or cycle monitoring counts | P-9.4 | 403 |

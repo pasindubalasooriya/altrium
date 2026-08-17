@@ -57,7 +57,14 @@ public class Acting {
         RequestContextHolder.resetRequestAttributes();
     }
 
-    private void asSubject(String subject) {
+    /**
+     * Acts as a subject claim directly, without an {@link AppUser} to hand.
+     *
+     * <p>Public for the concurrency test, which runs on threads of its own: the security
+     * context and the request-scoped HR resolver are both thread-local, so each thread has to
+     * establish its own caller and cannot be handed an entity from another transaction.
+     */
+    public void asSubject(String subject) {
         RequestContextHolder.setRequestAttributes(
                 new ServletRequestAttributes(new MockHttpServletRequest()));
 

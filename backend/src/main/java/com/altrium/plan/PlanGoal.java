@@ -40,9 +40,21 @@ public class PlanGoal {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "development_plan_id", nullable = false)
+    /**
+     * Exactly one of these two is set, which the database also insists on.
+     *
+     * <p>V6 extended this table rather than adding an {@code improvement_goal} alongside it,
+     * because P-5.2 gives goal approval to {@code mgr(S)} on both plan types in the same
+     * breath. Two tables would have meant two copies of the approval rule, and the second copy
+     * is the one that drifts.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "development_plan_id")
     private DevelopmentPlan plan;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "improvement_plan_id")
+    private ImprovementPlan improvementPlan;
 
     @Column(name = "title", nullable = false, length = 200)
     private String title;
@@ -83,12 +95,37 @@ public class PlanGoal {
         this.targetDate = targetDate;
     }
 
+    public PlanGoal(ImprovementPlan improvementPlan, String title, String detail, LocalDate targetDate) {
+        this.improvementPlan = improvementPlan;
+        this.title = title;
+        this.detail = detail;
+        this.targetDate = targetDate;
+    }
+
     public Long getId() {
         return id;
     }
 
     public DevelopmentPlan getPlan() {
         return plan;
+    }
+
+    public ImprovementPlan getImprovementPlan() {
+        return improvementPlan;
+    }
+
+    public boolean isImprovementGoal() {
+        return improvementPlan != null;
+    }
+
+    /**
+     * Whose goal this is, whichever plan holds it.
+     *
+     * <p>Every authorization decision about a goal is really a decision about this person, so
+     * resolving it in one place keeps the two plan types from growing two different answers.
+     */
+    public AppUser owner() {
+        return improvementPlan != null ? improvementPlan.getUser() : plan.getUser();
     }
 
     public String getTitle() {
