@@ -21,4 +21,24 @@ public interface PeerReviewRepository
     @Override
     @EntityGraph(attributePaths = {"subject", "peer", "cycle"})
     Page<PeerReview> findAll(Specification<PeerReview> spec, Pageable pageable);
+
+    /**
+     * The writing peer's own row, if they have already written one (P-3.5).
+     *
+     * <p>Keyed on the peer as well as the subject, so it answers only "have <em>I</em> written
+     * about this person?". It cannot be turned into "who has written about this person?", which
+     * is the question the subject must never be able to ask.
+     */
+    java.util.Optional<PeerReview> findByCycleIdAndSubjectIdAndPeerId(Long cycleId, Long subjectId, Long peerId);
+
+    /**
+     * Whether any peer has submitted about this subject yet.
+     *
+     * <p><strong>Only ever called behind an {@code ASSIGN_PEERS} decision</strong>, which is
+     * {@code mgr(S)} alone. It is a genuine hazard otherwise: a true here tells the caller
+     * somebody has written about them, which is the count P-3.3 forbids the subject to learn,
+     * one bit at a time. It exists because reassigning peers after feedback has arrived would
+     * strand that feedback, and the manager has to be told why.
+     */
+    boolean existsByCycleIdAndSubjectIdAndSubmittedAtIsNotNull(Long cycleId, Long subjectId);
 }

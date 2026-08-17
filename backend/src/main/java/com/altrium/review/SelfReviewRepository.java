@@ -9,4 +9,12 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
  */
 public interface SelfReviewRepository
         extends JpaRepository<SelfReview, Long>, JpaSpecificationExecutor<SelfReview> {
+
+    /**
+     * The write path's lookup: the one self-review a subject has in a cycle, or none yet.
+     *
+     * <p>Safe to have as a plain finder in a way the peer equivalent is not, because it takes
+     * the subject and returns only their own row. There is nothing here to discover.
+     */
+    java.util.Optional<SelfReview> findByCycleIdAndSubjectId(Long cycleId, Long subjectId);
 }
