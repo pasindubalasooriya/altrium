@@ -79,8 +79,38 @@ public enum Capability {
     /** HR normalises across the department; every change is recorded (P-4.3). */
     CALIBRATE_RATING(Kind.ARTIFACT, "P-4.3", HR_IN_SCOPE),
 
+    /**
+     * Sharing the rating with the subject - the act that opens the P-4.4 gate.
+     *
+     * <p>The scenario never names who performs it. §5 puts "the final rating is shared with the
+     * employee" immediately after the HR normalisation meeting, which makes HR the natural
+     * actor, so {@link Grounds#HR_IN_SCOPE} is listed first in intent.
+     *
+     * <p>{@link Grounds#DIRECT_MANAGER} is listed as well, and not as a convenience. P-2.2
+     * withholds HR grounds from an HR user's own case, so an HR-only release would leave the HR
+     * Head's rating permanently unreleasable and the person reviewed by Leadership under P-2.6
+     * never told the outcome - the same trap the P-2.2 ruling already had to be rescued from.
+     * With the manager listed, Leadership release it as that person's manager and no special
+     * case is needed.
+     *
+     * <p><strong>Assumption on the record:</strong> nothing forces the normalisation meeting to
+     * have happened first, because the system cannot know that it did. Modelling "HR has signed
+     * off" would invent a state the scenario does not have.
+     */
+    RELEASE_RATING(Kind.ARTIFACT, "P-4.4", DIRECT_MANAGER, HR_IN_SCOPE),
+
     /** S sees their final rating and manager feedback, and only once released (P-4.4). */
     READ_FINAL_RATING(Kind.ARTIFACT, "P-4.4", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
+
+    /**
+     * The calibration trail: what the manager chose, what HR changed it to, and who did it.
+     *
+     * <p>{@link Grounds#SELF} is absent, and deliberately, in the same way it is absent from
+     * {@link #READ_PEER_REVIEW}. P-4.4 gives the subject their final rating and their manager's
+     * feedback and nothing else; "your manager said Meets, HR moved it to Exceeds" is neither,
+     * and handing it over would undermine the manager in the conversation they have to hold.
+     */
+    READ_RATING_AUDIT(Kind.ARTIFACT, "P-4.3", DIRECT_MANAGER, HR_IN_SCOPE),
 
     // ---- Plans (P-5) ------------------------------------------------------------------
 

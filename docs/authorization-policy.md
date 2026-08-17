@@ -71,10 +71,12 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 | # | Policy |
 |---|---|
-| **P-4.1** | Only `mgr(S)` sets the final rating. It is **chosen, never computed** from peer ratings - no aggregate is stored or surfaced as a suggestion (scenario §11). |
+| **P-4.1** | Only `mgr(S)` sets the final rating. It is **chosen, never computed** from peer ratings - no aggregate is stored, derived on read, or offered by any endpoint (scenario §11). Changeable by the manager only while it is still their own figure: once HR has calibrated it, or once it is released, further changes are refused with 409. |
 | **P-4.2** | `mgr(S)` may read peer ratings for their reports, as input to P-4.1. |
-| **P-4.3** | HR-in-scope calibrates the final rating. Every change records before-value, after-value, actor and timestamp as an immutable append-only row. |
-| **P-4.4** | S reads their **final rating and manager feedback only**, and only once released. Nothing else in the cycle is exposed to them. |
+| **P-4.3** | HR-in-scope calibrates the final rating. Every change records before-value, after-value, actor and timestamp as an immutable append-only row, written in the **same transaction** as the change. A no-op calibration is refused with 400: every row in that table means "somebody moved this", and HR agreeing with the manager is the normal case and leaves no trace. Calibration after release is refused with 409. |
+| **P-4.4** | S reads their **final rating and manager feedback only**, and only once released. Nothing else in the cycle is exposed to them. "No rating yet" and "a rating exists and is withheld" produce an **identical response**, so the existence of a decided rating is itself not disclosed. The manager's feedback is gated on the same release, since feedback arriving first would tell the employee the outcome without telling them the outcome. |
+| **P-4.6** | **Release** opens the P-4.4 gate, and is performed by HR-in-scope or `mgr(S)`.<br><br>*A gap in the source documents rather than a conflict: §5 puts "the final rating is shared with the employee" straight after the HR normalisation meeting but never names the actor. `mgr(S)` is listed as well because P-2.2 withholds HR grounds on one's own case, so an HR-only release would leave the HR Head's rating permanently unreleasable - reviewed by Leadership under P-2.6 and never told the outcome. With the manager listed, Leadership release it as that person's manager and no special case is needed.*<br><br>*Nothing forces the normalisation meeting to have happened first, because the system cannot know that it did; modelling "HR has signed off" would invent a state the scenario does not have.* |
+| **P-4.7** | The calibration trail is readable by `mgr(S)` and HR-in-scope, and **never by S** - `READ_RATING_AUDIT` carries no `SELF` grounds, exactly as `READ_PEER_REVIEW` does not. P-4.4 gives the subject their rating and their manager's feedback; "your manager said Meets, HR moved it to Exceeds" is neither, and would undermine the manager in the conversation they have to hold. |
 | **P-4.5** | The scale is exactly `NEEDS_IMPROVEMENT`, `MEETS_EXPECTATIONS`, `EXCEEDS_EXPECTATIONS`. |
 
 ## P-5 Plans
@@ -161,5 +163,12 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | Peers reassigned after feedback has been submitted | P-3.8 | 409 |
 | Any review written while the cycle is not open | P-3.10 | 409 |
 | Self-review or manager review edited after submission | P-3.1, P-3.7 | 409 |
+| **HR with an explicit grant calibrates their own rating** - the rule-ordering test, at the point it matters most | P-0.6, P-2.2, P-2.4 | 403 |
+| HR, another manager, or the subject sets a final rating | P-4.1 | 403 |
+| Manager calibrates a rating | P-4.3 | 403 |
+| Subject reads their own calibration trail | P-4.7 | 403 |
+| Manager sets the rating back after HR calibrated it | P-4.1, P-4.3 | 409 |
+| Rating changed, calibrated, or released again after release | P-4.1, P-4.3, P-4.6 | 409 |
+| Subject reads their rating before release; and after | P-4.4 | withheld, then permitted |
 
 **Correctness tests alongside:** sweep is idempotent (run twice, one cycle opened) · a past-dated cycle opens on the next sweep · a suspended PDP resumes with goals and progress intact · the exclusivity invariant holds under two concurrent open-PIP requests, against real MySQL · a reporting-line loop is rejected.

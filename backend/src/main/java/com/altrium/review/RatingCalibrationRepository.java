@@ -11,4 +11,13 @@ import java.util.List;
 public interface RatingCalibrationRepository extends JpaRepository<RatingCalibration, Long> {
 
     List<RatingCalibration> findByFinalRatingIdOrderByCalibratedAtAsc(Long finalRatingId);
+
+    /**
+     * Whether HR has adjusted this rating.
+     *
+     * <p>Gates the manager's ability to change their own figure afterwards. Without it,
+     * calibration would be advisory: HR normalises upward, the manager sets it back, and the
+     * audit row records a change that no longer holds.
+     */
+    boolean existsByFinalRatingId(Long finalRatingId);
 }
