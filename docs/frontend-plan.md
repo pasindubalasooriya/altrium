@@ -12,8 +12,8 @@ The nine phases of the Sprint 1 frontend, with what each one covers and why the 
 | 3 | Employee console, `/my/*` | done |
 | 4 | Manager console, `/manager/*` | done, 202 backend + 17 frontend tests |
 | 5 | HR console, `/hr/*` | done, 208 backend + 17 frontend tests |
-| 6 | Leadership, `/leadership/metrics` | next |
-| 7 | Super Admin console, `/admin/*` | |
+| 6 | Leadership, `/leadership/metrics` | done, 20 frontend tests |
+| 7 | Super Admin console, `/admin/*` | next |
 | 8 | Verification: Vitest and the manual walkthrough | |
 
 Phases 3 to 7 are independent of each other and can be built in any order. The order above front-loads the flows that carry the marks.
@@ -135,7 +135,11 @@ The team list is the **same endpoint** the employee console calls. It returns di
 
 Consumes the phase 0 endpoint. Recharts bar chart of the rating distribution, and a per-department completion table.
 
-**Nothing is clickable through to a person.** No row links to a review, because there is no endpoint behind such a link and there never will be one. The absence is the policy.
+**Nothing is clickable through to a person.** No row links to a review, because there is no endpoint behind such a link and there never will be one. The absence is the policy, and a test asserts the strong form of it: the page renders **no link at all**.
+
+The `leadership.ts` types carry no person id, so nothing built on them could construct a drill-down even by mistake, and there is no hook that could ask for a per-department rating distribution.
+
+This is the only lazily loaded route. Recharts is about a third of the bundle and exactly one screen uses it - one that four of the five roles never open.
 
 ## Phase 7 - Super Admin console (`/admin/*`)
 

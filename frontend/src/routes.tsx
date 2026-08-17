@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { useCurrentUser } from './auth/useCurrentUser'
@@ -16,6 +17,18 @@ import { CycleMonitoring } from './features/hr/CycleMonitoring'
 import { HrReviews } from './features/hr/HrReviews'
 import { Calibration } from './features/hr/Calibration'
 import { ImprovementPlans } from './features/hr/ImprovementPlans'
+
+/**
+ * The one lazily loaded route.
+ *
+ * Recharts is around a third of the whole bundle, and exactly one screen uses it - one that
+ * four of the five roles never open. Everything else is loaded eagerly, because splitting
+ * routes that share the same handful of components buys nothing and makes the loading states
+ * harder to reason about.
+ */
+const Metrics = lazy(() =>
+  import('./features/leadership/Metrics').then((module) => ({ default: module.Metrics })),
+)
 
 /**
  * The route table.
@@ -52,7 +65,14 @@ export function AppRoutes() {
         <Route path="hr/reviews/:subjectId" element={<Calibration />} />
         <Route path="hr/improvement-plans" element={<ImprovementPlans />} />
 
-        <Route path="leadership/metrics" element={<ToBuild phase="6" name="Metrics" />} />
+        <Route
+          path="leadership/metrics"
+          element={
+            <Suspense fallback={<Loading />}>
+              <Metrics />
+            </Suspense>
+          }
+        />
 
         <Route path="admin/users" element={<ToBuild phase="7" name="Users" />} />
         <Route path="admin/departments" element={<ToBuild phase="7" name="Departments" />} />
