@@ -108,6 +108,31 @@ cd backend
 .\mvnw.cmd spring-boot:run    # start the API on :8080
 ```
 
+## 4. Run the frontend
+
+Node 20 or newer. In a second terminal, with the backend already running:
+
+```powershell
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+npm test           # Vitest
+npm run build      # typecheck and production build
+```
+
+**The port is not negotiable.** `http://localhost:5173` is registered as the redirect URL in the Asgardeo console and is the origin the backend's CORS configuration allows, so all three have to agree. Vite is set to `strictPort`, which turns a clash into a startup failure rather than a mystery in the browser.
+
+No `.env` is needed. The tenant defaults live in `src/config.ts`, exactly as the backend commits its Asgardeo issuer URI - the client ID is a public identifier for a PKCE single-page app, not a credential. Copy `.env.example` to `.env` only to point somewhere else.
+
+There is deliberately **no Vite dev proxy** for `/api`. The browser makes real cross-origin calls in development, which is what it will do once deployed, so a CORS misconfiguration shows up now rather than at the first deployment.
+
+| Symptom | Cause |
+|---|---|
+| Every screen says the API is unreachable | Backend not running, or `ALTRIUM_DB_PASSWORD` missing so it failed to start |
+| "Your account is not set up in Altrium" | Signed in as an Asgardeo user with no `app_user` row, or a deactivated one. Only five seeded people can log in - see [seed-data.md](seed-data.md) |
+| Login redirects back and immediately signs you out again | The redirect URL in the Asgardeo console does not match `http://localhost:5173` exactly |
+| Sign-out appears not to work | Only if the code stops calling `signOut()`. Clearing tokens locally leaves the Asgardeo session alive, so the next sign-in reuses it silently |
+
 ## Troubleshooting
 
 | Symptom | Cause |
