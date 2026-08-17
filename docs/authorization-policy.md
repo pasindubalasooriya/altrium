@@ -87,7 +87,9 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-5.2** | Only `mgr(S)` approves PDP or PIP goals as complete. |
 | **P-5.3** | **PIP co-sign gate.** A PIP with `cosigned_at IS NULL` is invisible to S. Enforced as a predicate in the query, so calling the endpoint directly 403s - not a UI condition. |
 | **P-5.4** | Only HR-in-scope may co-sign and record the witness. A manager can do neither; that separation is the entire point of the formality objects (scenario §9). |
-| **P-5.5** | PDP goal target dates are movable by `mgr(S)`. **PIP deadlines are immutable once set** - no actor, including HR, may extend them. |
+| **P-5.5** | PDP goal target dates are movable **by `mgr(S)`** - a separate capability from writing the goal, which the employee also holds. Read strictly: an employee who could reschedule their own deadlines would make the date decorative. **PIP deadlines are immutable once set** - no actor, including HR, may extend them. |
+| **P-5.9** | The PDP is **not keyed to a cycle**. One enduring row per employee, unique on `user_id`, materialised the first time anybody asks for it. That is what makes §8's "from the moment they join" and §5 step 9's "resumes the suspended development plan with its goals and progress intact" the same fact - a per-cycle plan would make carry-over a copy, and a copy is where progress gets lost. |
+| **P-5.10** | An approved goal is frozen: it cannot be edited or removed until `mgr(S)` reopens it (409). Reopening is gated on `APPROVE_GOAL`, the same authority that granted the approval, so the two cannot drift apart. |
 | **P-5.6** | A PIP must carry non-empty consequence-clause text before it can be co-signed. |
 | **P-5.7** | **Exclusivity invariant.** No employee holds an ACTIVE PDP and an ACTIVE PIP simultaneously. Enforced in `PlanService` **and** by a database constraint, so concurrent requests cannot both slip through. |
 | **P-5.8** | Only `PlanService` mutates plan status. No controller or repository writes a status field. |
@@ -137,6 +139,12 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 |---|---|---|
 | Manager reads a non-report's review | P-1.2 | 403 |
 | Manager reads a non-report's plan | P-1.2, P-5.1 | 403 |
+| HR writes, edits or approves anything on a PDP in scope | P-5.1 | 403 |
+| Employee moves their own goal's target date | P-5.5 | 403 |
+| Employee approves their own goal | P-5.2 | 403 |
+| Goal id lifted from another person's plan | P-0.4 | 403 |
+| Leadership member's own PDP requested, by them or their manager | P-7.2 | 403 |
+| Approved goal edited or removed before being reopened | P-5.10 | 409 |
 | Subject requests peer reviews about themselves, by every route including list endpoints and pagination counts | P-3.3 | 403 / absent |
 | HR acts in their own department without the explicit grant | P-2.3 | 403 |
 | **HR with an explicit grant calibrates their own rating, co-signs their own PIP, or reads their own peer feedback** - the rule-ordering test | P-0.6, P-2.2, P-2.4 | 403 |

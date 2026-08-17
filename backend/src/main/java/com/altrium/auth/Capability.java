@@ -122,6 +122,19 @@ public enum Capability {
     /** Only {@code mgr(S)} marks a goal complete, on either plan type (P-5.2). */
     APPROVE_GOAL(Kind.ARTIFACT, "P-5.2", DIRECT_MANAGER),
 
+    /**
+     * Moving a development goal's target date (P-5.5).
+     *
+     * <p>Separate from {@link #WRITE_DEVELOPMENT_PLAN}, which the employee also holds, because
+     * P-5.5 names {@code mgr(S)} specifically for the dates. The employee writes what the goal
+     * is and how it is going; when it is due is agreed with their manager, and rescheduling it
+     * unilaterally would make the date decorative.
+     *
+     * <p>There is deliberately no PIP equivalent. A PIP deadline is immutable once set, which
+     * is {@link #EXTEND_PIP_DEADLINE} with its empty grounds set.
+     */
+    MOVE_GOAL_TARGET_DATE(Kind.ARTIFACT, "P-5.5", DIRECT_MANAGER),
+
     /** Invisible to S until co-signed - a state gate, not a role gate (P-5.3). */
     READ_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.3", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
 
