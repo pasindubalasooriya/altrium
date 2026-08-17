@@ -1,6 +1,8 @@
 package com.altrium.testsupport;
 
 import com.altrium.org.AppUser;
+import com.altrium.review.Cohort;
+import com.altrium.review.CohortMember;
 import com.altrium.review.CycleParticipant;
 import com.altrium.review.CycleStatus;
 import com.altrium.review.FinalRating;
@@ -46,6 +48,34 @@ public class ReviewFixture {
         cycle.setOpenedAt(Instant.now());
         em.persist(cycle);
         return cycle;
+    }
+
+    /**
+     * A cycle that is configured but not open, dated so the sweep will find it due.
+     *
+     * <p>Takes the quadrimester explicitly, because a sweep test's whole point is that the
+     * cycle's quadrimester and the cohort's agree. The financial year is still unique per call,
+     * so cycles never collide on the period key.
+     */
+    public ReviewCycle configuredCycle(int quadrimesterNo, LocalDate startDate) {
+        int n = QUADRIMESTER.incrementAndGet();
+        ReviewCycle cycle = new ReviewCycle(
+                2000 + n, quadrimesterNo, startDate, startDate.plusMonths(4));
+        em.persist(cycle);
+        return cycle;
+    }
+
+    /** A cohort attached to a quadrimester, or to none when {@code quadrimesterNo} is null. */
+    public Cohort cohort(String name, Integer quadrimesterNo) {
+        Cohort cohort = new Cohort(name + "-" + QUADRIMESTER.incrementAndGet(), quadrimesterNo);
+        em.persist(cohort);
+        return cohort;
+    }
+
+    public CohortMember member(Cohort cohort, AppUser user) {
+        CohortMember member = new CohortMember(cohort, user);
+        em.persist(member);
+        return member;
     }
 
     /** Puts a person under review, snapshotting the department they were in at intake. */

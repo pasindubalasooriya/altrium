@@ -36,4 +36,21 @@ public interface CycleParticipantRepository
     Page<CycleParticipant> findAll(Specification<CycleParticipant> spec, Pageable pageable);
 
     Optional<CycleParticipant> findByCycleIdAndSubjectId(Long cycleId, Long subjectId);
+
+    /**
+     * Intake's idempotency check (P-6.4). Reached only by the sweep, which runs as the system
+     * principal and has no caller to scope against - it is not a read of anybody's review, it
+     * is the job asking whether it already did this.
+     */
+    boolean existsByCycleIdAndSubjectId(Long cycleId, Long subjectId);
+
+    /**
+     * Whether this person is under review in a cycle that has already opened.
+     *
+     * <p>The guard on the blocked scenario section 15.4 path: what happens to an employee's
+     * in-flight reviews when they are removed from a cohort after the cycle has opened is
+     * unanswered, so removal is refused while this is true rather than have the system quietly
+     * invent an answer. Not a read of the review either - only of whether one is in flight.
+     */
+    boolean existsBySubjectIdAndCycleStatus(Long subjectId, CycleStatus status);
 }

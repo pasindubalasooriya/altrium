@@ -91,10 +91,12 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 | # | Policy |
 |---|---|
-| **P-6.1** | Only the Super Admin writes `quadrimester_config` and `cohort_membership`. |
-| **P-6.2** | The cycle start date may be changed **only while `opened_at IS NULL`**; afterwards refused. |
-| **P-6.3** | HR monitors cycles for their granted departments only - counts and statuses scoped by `grants(A)`, subject to P-2.2 and P-2.3. |
-| **P-6.4** | The sweep runs as a **system principal**: it bypasses user authorization (there is no user) but remains bound by every domain invariant. |
+| **P-6.1** | Only the Super Admin writes `review_cycle`, `cohort` and `cohort_member`. Enforced by the `CONFIGURE_CYCLE` capability inside `CycleService`, not by a role annotation on the controller. |
+| **P-6.2** | The cycle start date may be changed **only while `opened_at IS NULL`**; afterwards refused with **409**, not 403. The Super Admin holds the permission; it is the cycle's state that forbids the write. |
+| **P-6.3** | HR monitors cycles for their granted departments only - counts and statuses scoped by `grants(A)`, subject to P-2.2 and P-2.3. **The caller's own participant row is excluded from every total**, so an HR Head with an explicit grant oversees their department without their own case being part of what they oversee. Monitoring returns counts and never names a person; anyone needing the rows uses the scoped review list. |
+| **P-6.4** | The sweep runs as a **system principal**: it bypasses user authorization (there is no user) but remains bound by every domain invariant. Idempotency and "date arrived or passed" are properties of the selection predicate (`opened_at IS NULL AND start_date <= :today`), not of a flag anybody maintains. Intake applies P-0.7 and P-1.5 inside the query. |
+| **P-6.5** | A cohort attached to no quadrimester is never swept in, and a cycle whose quadrimester has no cohort opens **empty rather than failing**. Both are visible to HR through P-6.3, which is the trade-off §15.4 accepts. |
+| **P-6.6** | An employee belongs to **at most one cohort**, enforced by a unique key on `cohort_member.user_id`. This is what makes §4's "assessed once per year in a fixed quadrimester" a guarantee of the schema. Moving somebody between cohorts is an update, never a second row. |
 
 ## P-7 Leadership
 
@@ -117,7 +119,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 |---|---|
 | **P-9.1** | Manages users, reporting lines, departments and activation flags. |
 | **P-9.2** | Manages HR department grants, including the explicit-grant flag. |
-| **P-9.3** | Manages cycle configuration and cohort membership. |
+| **P-9.3** | Manages cycle configuration and cohort membership. They decide who is reviewed and when, and can read none of the result (P-9.4) - including the monitoring counts, which are HR's. |
 | **P-9.4** | **No read access to any review, rating or plan content.**<br><br>*Not addressed in the source documents; settled by the team. Since the Super Admin grants HR their departments, review access on top would make the role omnipotent and defeat segregation of duties.* |
 
 ---
@@ -140,7 +142,13 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | Any actor extends a PIP deadline | P-5.5 | 403 |
 | Leadership requests an individual review | P-7.1 | 403 |
 | Leadership is made a reviewee | P-1.5, P-7.2 | rejected at creation |
-| Super Admin requests review content | P-9.4 | 403 |
+| Super Admin requests review content, or cycle monitoring counts | P-9.4 | 403 |
+| HR configures a cycle or a cohort, however wide their grants | P-6.1 | 403 |
+| Manager requests cycle monitoring for a department | P-6.3 | 403 |
+| HR monitors their own department on a plain grant | P-2.3, P-6.3 | 403 |
+| HR Head monitors their own department; their own row in the counts | P-2.2, P-6.3 | department permitted, own row excluded |
+| Super Admin reschedules a cycle that has opened | P-6.2 | 409 |
+| Super Admin removes a mid-cycle employee from their cohort | §15.4 | 409, path unbuilt |
 | Peer submits twice | P-3.5 | 409 |
 | Manager is assigned as their own report's peer | P-3.6 | rejected at assignment |
 
