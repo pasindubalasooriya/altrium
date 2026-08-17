@@ -13,8 +13,8 @@ The nine phases of the Sprint 1 frontend, with what each one covers and why the 
 | 4 | Manager console, `/manager/*` | done, 202 backend + 17 frontend tests |
 | 5 | HR console, `/hr/*` | done, 208 backend + 17 frontend tests |
 | 6 | Leadership, `/leadership/metrics` | done, 20 frontend tests |
-| 7 | Super Admin console, `/admin/*` | next |
-| 8 | Verification: Vitest and the manual walkthrough | |
+| 7 | Super Admin console, `/admin/*` | done, 213 backend + 20 frontend tests |
+| 8 | Verification: Vitest and the manual walkthrough | next - the automated half is done; the walkthrough is yours |
 
 Phases 3 to 7 are independent of each other and can be built in any order. The order above front-loads the flows that carry the marks.
 
@@ -157,7 +157,11 @@ Server-paged users table - the one place the stack explicitly says the console m
 
 **Cycle dates are editable only while `opened_at` is null**, and cohort removal after opening returns 409, rendered as the reason it is refused with a note that the section 15.4 behaviour is awaiting the Product Owner. The UI should not paper over an open question.
 
-**No review, rating or plan content appears anywhere in this console** (P-9.4).
+**No review, rating or plan content appears anywhere in this console** (P-9.4). `admin.ts` contains no hook that could fetch any, which is the point rather than an omission.
+
+> **Third gap found while building.** The HR-grants screen needs "the HR users", and the user list had no role filter - so the client would have picked them out of a fetched page, meaning "the HR users on this page". Correct at thirty people, silently wrong at three hundred. `?role=` is now a predicate in the `Specification`, with five tests, one of which finds a match on a later page that the client-side version could never have seen.
+
+**The explicit-grant flag is presented as a property of one grant, never as a role.** There is no "make this person an HR Head" control, because the HR Head is a person holding an explicit grant, and naming it as a role would invite somebody to implement it as one. The screen states, at the moment the flag is set, that it does not lift the own-review block - that is the only moment an administrator would think otherwise.
 
 ## Phase 8 - verification
 

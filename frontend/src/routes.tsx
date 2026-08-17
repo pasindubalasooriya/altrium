@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { useCurrentUser } from './auth/useCurrentUser'
-import { EmptyState, Loading } from './components/States'
+import { Loading } from './components/States'
 import { MyReviews } from './features/my/MyReviews'
 import { SelfReview } from './features/my/SelfReview'
 import { PeerTasks } from './features/my/PeerTasks'
@@ -17,6 +17,11 @@ import { CycleMonitoring } from './features/hr/CycleMonitoring'
 import { HrReviews } from './features/hr/HrReviews'
 import { Calibration } from './features/hr/Calibration'
 import { ImprovementPlans } from './features/hr/ImprovementPlans'
+import { Users } from './features/admin/Users'
+import { Departments } from './features/admin/Departments'
+import { HrGrants } from './features/admin/HrGrants'
+import { Cycles } from './features/admin/Cycles'
+import { Cohorts } from './features/admin/Cohorts'
 
 /**
  * The one lazily loaded route.
@@ -74,11 +79,11 @@ export function AppRoutes() {
           }
         />
 
-        <Route path="admin/users" element={<ToBuild phase="7" name="Users" />} />
-        <Route path="admin/departments" element={<ToBuild phase="7" name="Departments" />} />
-        <Route path="admin/hr-grants" element={<ToBuild phase="7" name="HR department grants" />} />
-        <Route path="admin/cycles" element={<ToBuild phase="7" name="Cycles" />} />
-        <Route path="admin/cohorts" element={<ToBuild phase="7" name="Cohorts" />} />
+        <Route path="admin/users" element={<Users />} />
+        <Route path="admin/departments" element={<Departments />} />
+        <Route path="admin/hr-grants" element={<HrGrants />} />
+        <Route path="admin/cycles" element={<Cycles />} />
+        <Route path="admin/cohorts" element={<Cohorts />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -104,14 +109,4 @@ function Landing() {
     return null
   }
   return <Navigate to={me.landing} replace />
-}
-
-/** Honest placeholder. Says which phase builds it rather than pretending to be empty. */
-function ToBuild({ name, phase }: { name: string; phase: string }) {
-  return (
-    <>
-      <h1 className="mb-4 text-xl font-semibold tracking-tight">{name}</h1>
-      <EmptyState>Not built yet - frontend phase {phase}.</EmptyState>
-    </>
-  )
 }

@@ -166,9 +166,9 @@ public class OrgService {
      * meaning tests that wrap themselves in one would never see it.
      */
     @Transactional(readOnly = true)
-    public <T> Page<T> listUsers(String search, Long departmentId, Boolean active,
+    public <T> Page<T> listUsers(String search, Long departmentId, Boolean active, Role role,
                                  Pageable pageable, Function<AppUser, T> mapper) {
-        return users.findAll(userFilter(search, departmentId, active), pageable).map(mapper);
+        return users.findAll(userFilter(search, departmentId, active, role), pageable).map(mapper);
     }
 
     @Transactional(readOnly = true)
@@ -190,7 +190,8 @@ public class OrgService {
 
     // ---------------------------------------------------------------- internals
 
-    private Specification<AppUser> userFilter(String search, Long departmentId, Boolean active) {
+    private Specification<AppUser> userFilter(String search, Long departmentId, Boolean active,
+                                              Role role) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (search != null && !search.isBlank()) {
@@ -204,6 +205,13 @@ public class OrgService {
             }
             if (active != null) {
                 predicates.add(cb.equal(root.get("active"), active));
+            }
+            if (role != null) {
+                // In the query rather than applied to a fetched page. Filtering afterwards
+                // would page over everybody and then discard, so "the HR users" would mean
+                // "the HR users on this page of everybody" - which stops being the same thing
+                // the moment the organisation outgrows one page.
+                predicates.add(cb.isMember(role, root.get("roles")));
             }
             return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
         };
