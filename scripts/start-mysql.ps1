@@ -2,7 +2,7 @@
 #
 # This instance runs as a plain user process, not a Windows service, because
 # service installation requires administrator rights that the dev account here
-# does not have. That means it does NOT survive a reboot — run this script
+# does not have. That means it does NOT survive a reboot - run this script
 # again after restarting.
 #
 # Usage:  .\scripts\start-mysql.ps1

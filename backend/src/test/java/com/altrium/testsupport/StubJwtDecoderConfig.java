@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
 /**
  * Stands in for Asgardeo's JWKS validation so tests never touch the network.
  *
- * <p>Only signature verification is replaced. Everything downstream — the resource-server
- * filter chain, {@code AltriumJwtAuthenticationConverter}, the authority checks — is the
+ * <p>Only signature verification is replaced. Everything downstream - the resource-server
+ * filter chain, {@code AltriumJwtAuthenticationConverter}, the authority checks - is the
  * real production path. A denial test that stubbed the converter would prove nothing.
  *
  * <p>Token format is {@code subject} or {@code subject|ROLE_A,ROLE_B}, where the roles become

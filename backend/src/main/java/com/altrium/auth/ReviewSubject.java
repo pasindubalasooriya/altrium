@@ -9,7 +9,7 @@ import com.altrium.org.Role;
  *
  * <p>Deliberately not the {@code AppUser} entity. The decision must be able to state exactly
  * what it depended on, and a live entity invites a decision to quietly depend on something
- * else — a lazily-loaded association, a field that changes mid-transaction — that no test
+ * else - a lazily-loaded association, a field that changes mid-transaction - that no test
  * then covers.
  *
  * @param id           the reviewee

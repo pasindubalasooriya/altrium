@@ -19,7 +19,7 @@ import java.time.Instant;
  *
  * <p>{@code manager} records who actually wrote it, rather than leaving the reader to infer
  * it from today's reporting line. Reporting lines move, and when they do, last quarter's
- * review is still the work of whoever wrote it — inferring the author would silently
+ * review is still the work of whoever wrote it - inferring the author would silently
  * reattribute it to the new manager.
  */
 @Entity

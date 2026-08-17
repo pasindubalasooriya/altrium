@@ -30,7 +30,7 @@ spring:
       resourceserver:
         jwt:
           # Asgardeo (decided, do not substitute). The backend validates JWTs against the
-          # tenant's JWKS endpoint — no shared secret. See docs/asgardeo-setup.md.
+          # tenant's JWKS endpoint - no shared secret. See docs/asgardeo-setup.md.
           #
           # The issuer is a public identifier, not a credential, so the tenant default is
           # committed and the app starts without extra configuration. Override the env var

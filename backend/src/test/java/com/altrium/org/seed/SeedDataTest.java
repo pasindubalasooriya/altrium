@@ -70,7 +70,7 @@ class SeedDataTest {
     }
 
     @Test
-    @DisplayName("P-7.2: Leadership sit above the structure — no manager, no department")
+    @DisplayName("P-7.2: Leadership sit above the structure - no manager, no department")
     void P_7_2_leadershipHaveNoManagerOrDepartment() {
         List<AppUser> leadership = users.findAll().stream()
                 .filter(u -> u.getRoles().contains(Role.LEADERSHIP))

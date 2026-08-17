@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Feature 4 — reading permitted reviews.
+ * Feature 4 - reading permitted reviews.
  *
  * <p><strong>There is no {@code @PreAuthorize} on this class, and that is deliberate.</strong>
  * A role annotation can express "an HR user may call this"; it cannot express "an HR user
@@ -42,7 +42,7 @@ public class ReviewController {
      * The reviews the caller may see in a cycle.
      *
      * <p>Scoped inside the SQL, so the {@code totalElements} of this page counts what the
-     * caller may see — not what exists. A count computed before filtering would report the
+     * caller may see - not what exists. A count computed before filtering would report the
      * size of the organisation to anybody who paged through it.
      */
     @GetMapping
@@ -68,7 +68,7 @@ public class ReviewController {
     }
 
     /**
-     * The cycles themselves — dates and status, no participants.
+     * The cycles themselves - dates and status, no participants.
      *
      * <p>Unscoped because a cycle is not about anybody: its dates are the same fact for the
      * whole organisation, and the client needs them to ask any of the questions above.

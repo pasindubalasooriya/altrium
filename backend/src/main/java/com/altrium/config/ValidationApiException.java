@@ -1,7 +1,7 @@
 package com.altrium.config;
 
 /**
- * A request that is malformed against the organisation's rules rather than its data — most
+ * A request that is malformed against the organisation's rules rather than its data - most
  * importantly a reporting line that would create a loop (P-1.4). Surfaces as **400**.
  *
  * <p>Unlike a denial, the message is returned to the caller. Nothing here is confidential:

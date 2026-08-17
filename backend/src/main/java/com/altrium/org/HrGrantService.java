@@ -14,8 +14,8 @@ import java.util.function.Function;
  *
  * <p>These grants are the sole input to HR's department scope, so this service is where the
  * conflict-of-interest control is actually configured. It stays deliberately thin: the
- * decisions about what a grant <em>means</em> — the own-department block and the explicit
- * override — belong to the resolver that reads them per request, not to the writer.
+ * decisions about what a grant <em>means</em> - the own-department block and the explicit
+ * override - belong to the resolver that reads them per request, not to the writer.
  */
 @Service
 @Transactional

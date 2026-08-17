@@ -14,7 +14,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * Builds the decoder that validates Asgardeo access tokens.
  *
  * <p>Spring's out-of-the-box decoder rejects them. Asgardeo stamps its access tokens with the
- * JOSE header {@code typ: at+jwt} — the RFC 9068 media type for a JWT access token — while
+ * JOSE header {@code typ: at+jwt} - the RFC 9068 media type for a JWT access token - while
  * Nimbus's default type verifier accepts only {@code JWT} or no type at all. The result is
  * every request failing with "JOSE header typ (type) at+jwt not allowed", which surfaces as a
  * flat 401 and looks indistinguishable from a bad token.
@@ -25,7 +25,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  *
  * <p>Guarded by a flag of our own rather than by the presence of {@code issuer-uri}. A
  * profile-specific file layers over the base configuration instead of replacing it, so the
- * issuer default in {@code application.yml} is visible even under the test profile — the
+ * issuer default in {@code application.yml} is visible even under the test profile - the
  * condition would always match, and this bean would collide with the test's stub decoder.
  * Tests set {@code altrium.security.asgardeo-decoder=false}.
  *

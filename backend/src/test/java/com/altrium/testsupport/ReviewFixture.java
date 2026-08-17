@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Builds review artifacts directly, bypassing the services that will eventually write them.
  *
  * <p>Deliberate: features 7 to 13 do not exist yet, and a read-access test must not wait on
- * them. It also keeps the denial tests honest — they assert what the <em>read</em> layer
+ * them. It also keeps the denial tests honest - they assert what the <em>read</em> layer
  * permits, with no chance of passing because a write path happened to refuse first.
  */
 @Component
@@ -86,7 +86,7 @@ public class ReviewFixture {
         return review;
     }
 
-    /** A rating the subject may not see yet — the P-4.4 state gate's "before" case. */
+    /** A rating the subject may not see yet - the P-4.4 state gate's "before" case. */
     public FinalRating unreleasedRating(ReviewCycle cycle, AppUser subject, AppUser setBy, Rating rating) {
         FinalRating finalRating = new FinalRating(cycle, subject, rating, setBy);
         em.persist(finalRating);

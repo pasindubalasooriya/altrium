@@ -9,7 +9,7 @@ import java.util.Set;
  *                            own-department block and any explicit-grant override
  * @param ownDepartmentId     the caller's own department, or null
  * @param ownDepartmentLifted true when an explicit grant lifted the own-department block
- *                            (P-2.4) — the HR Head case
+ *                            (P-2.4) - the HR Head case
  */
 public record HrScope(Set<Long> departmentIds, Long ownDepartmentId, boolean ownDepartmentLifted) {
 

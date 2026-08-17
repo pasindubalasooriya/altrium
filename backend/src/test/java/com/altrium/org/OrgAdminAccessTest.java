@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Feature 2 — who may manage the organisation (P-9.1).
+ * Feature 2 - who may manage the organisation (P-9.1).
  *
  * <p>These are the denial tests that matter most for this feature: org management is where
  * reporting lines and department membership are set, and both are inputs the entire

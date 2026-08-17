@@ -15,7 +15,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * A person under review in a given cycle — the row that makes "the reviews I may see" a
+ * A person under review in a given cycle - the row that makes "the reviews I may see" a
  * query rather than a computation.
  *
  * <p>It is a snapshot taken when the cycle opens, and that is the point. The department is
@@ -41,7 +41,7 @@ public class CycleParticipant {
 
     /**
      * The reviewee. Named {@code subject} in every artifact so one Specification can scope
-     * them all identically (P-0.3) — a table whose column were named differently would need
+     * them all identically (P-0.3) - a table whose column were named differently would need
      * its own predicate, and that is where the divergence starts.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

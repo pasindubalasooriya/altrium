@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * What the caller is told about themselves after login.
  *
- * <p>Carries identity and roles only. No review, rating or plan content appears here — the
+ * <p>Carries identity and roles only. No review, rating or plan content appears here - the
  * landing decision must not become a side channel for data the caller may not read.
  *
  * @param landing where the frontend should send this user after login

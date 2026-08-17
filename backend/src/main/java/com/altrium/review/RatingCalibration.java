@@ -21,7 +21,7 @@ import java.time.Instant;
  *
  * <p>{@code ratingBefore} is what makes calibration visible at all. Without it, an adjusted
  * rating is indistinguishable from a manager who simply chose differently, and the
- * normalisation the client asked for becomes untraceable — which is the opposite of the
+ * normalisation the client asked for becomes untraceable - which is the opposite of the
  * accountability it exists to provide.
  */
 @Entity

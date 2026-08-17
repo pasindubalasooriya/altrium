@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Feature 1 — identity resolution and role-based landing.
+ * Feature 1 - identity resolution and role-based landing.
  *
  * <p>Every test calls the endpoint directly with a bearer token. Nothing here drives a UI: a
  * UI-driven test proves a control is hidden, not that access is refused.
@@ -39,7 +39,7 @@ class IdentityAndLandingTest {
     private OrgFixture org;
 
     @Test
-    @DisplayName("no token at all is 401, not 403 — the caller has not identified themselves yet")
+    @DisplayName("no token at all is 401, not 403 - the caller has not identified themselves yet")
     void noTokenIsUnauthorized() throws Exception {
         mvc.perform(get(ME))
                 .andExpect(status().isUnauthorized());
@@ -91,7 +91,7 @@ class IdentityAndLandingTest {
     }
 
     @Test
-    @DisplayName("a token's role claim grants nothing — the database governs authorities")
+    @DisplayName("a token's role claim grants nothing - the database governs authorities")
     void tokenRoleClaimGrantsNothing() throws Exception {
         // Provisioned as a plain employee, but presenting a token that asserts SUPER_ADMIN.
         // If claims were trusted, this would land on the admin console.

@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Feature 4 — view permitted reviews, over HTTP.
+ * Feature 4 - view permitted reviews, over HTTP.
  *
  * <p>These call the endpoints directly with a minted JWT. That is the whole point of writing
  * them this way: a test driving a UI proves a button is hidden, which is not access control.
@@ -105,7 +105,7 @@ class PermittedReviewReadTest {
         AppUser samuel = org.userIn(peopleOps, "samuel", Role.EMPLOYEE);
         AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
         org.flush();
-        // Granted Engineering, plus her own department without the explicit flag — which
+        // Granted Engineering, plus her own department without the explicit flag - which
         // therefore buys her nothing (P-2.3).
         grants.grant(hana.getId(), engineering.getId(), false, null, g -> g.getId());
         grants.grant(hana.getId(), peopleOps.getId(), false, null, g -> g.getId());
@@ -116,34 +116,55 @@ class PermittedReviewReadTest {
         reviews.participant(cycle, hana);
         reviews.flush();
 
+        // Two rows: john, through the Engineering grant, and hana herself, because she is an
+        // employee with a review like anyone (P-0.1, P-2.2). Samuel is the one who proves the
+        // rule - same department as hana, covered by a grant she actually holds, and still
+        // out of reach because that grant carries no explicit flag (P-2.3).
         mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
                         .header("Authorization", bearer("hana")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.content[0].subjectName").value("john"));
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[?(@.subjectName == 'john')]").isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.subjectName == 'hana')]").isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.subjectName == 'samuel')]").isEmpty());
     }
 
     @Test
-    @DisplayName("P-2.2: the HR Head's explicit grant does not put their own review in their own list")
-    void P_2_2_hrHeadOwnRowAbsentFromTheirList() throws Exception {
+    @DisplayName("P-2.2: the HR Head's own record is theirs to read, but carries no HR authority")
+    void P_2_2_hrHeadSeesOwnRecordAsAnEmployeeOnly() throws Exception {
         Department peopleOps = org.department("People Operations");
+        AppUser richard = org.user("richard", Role.EMPLOYEE, Role.LEADERSHIP);
         AppUser kevin = org.userIn(peopleOps, "kevin", Role.EMPLOYEE, Role.HR);
         AppUser samuel = org.userIn(peopleOps, "samuel", Role.EMPLOYEE);
+        AppUser hana = org.userIn(peopleOps, "hana", Role.EMPLOYEE, Role.HR);
+        kevin.setManager(richard);
         org.flush();
         grants.grant(kevin.getId(), peopleOps.getId(), true, null, g -> g.getId());
 
         ReviewCycle cycle = reviews.openCycle();
         reviews.participant(cycle, kevin);
         reviews.participant(cycle, samuel);
+        // Leadership conduct the HR Head's review (P-2.6), and he is entitled to the outcome.
+        reviews.managerReview(cycle, kevin, richard, "steady stewardship of the function");
+        reviews.releasedRating(cycle, kevin, richard, Rating.EXCEEDS_EXPECTATIONS);
+        reviews.peerReview(cycle, kevin, hana, "could delegate more");
         reviews.flush();
 
-        // The explicit grant covers his own department, and he is in it. The own-review
-        // block is the not-equal term in the WHERE clause, so it survives into the count.
+        // He is in his own list, as an employee with a review like anyone else.
         mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
                         .header("Authorization", bearer("kevin")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.content[0].subjectName").value("samuel"));
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        // And his own record gives him what P-4.4 gives every subject - and nothing his HR
+        // grant might otherwise have added. The peer feedback written about him is absent,
+        // because no subject reads peer feedback, and his explicit grant does not change that.
+        mvc.perform(get(REVIEWS + "/" + kevin.getId()).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("kevin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating.rating").value("EXCEEDS_EXPECTATIONS"))
+                .andExpect(jsonPath("$.managerReview.feedback").value("steady stewardship of the function"))
+                .andExpect(jsonPath("$.peerReviews").doesNotExist());
     }
 
     @Test
@@ -202,7 +223,7 @@ class PermittedReviewReadTest {
         reviews.participant(cycle, omar);
         reviews.flush();
 
-        // The id is real and the record exists. Being absent from the list is not enough —
+        // The id is real and the record exists. Being absent from the list is not enough -
         // the direct route has to be refused too, or the id is the way around the list.
         mvc.perform(get(REVIEWS + "/" + omar.getId()).param("cycleId", cycle.getId().toString())
                         .header("Authorization", bearer("elena")))

@@ -18,7 +18,7 @@ import java.util.List;
  * feature supplies only the path from its own root to the subject.
  *
  * <p>The generated predicate is a disjunction of the caller's grounds. When the caller has
- * none it is {@code cb.disjunction()} — false — so an unscoped caller gets an empty page and
+ * none it is {@code cb.disjunction()} - false - so an unscoped caller gets an empty page and
  * an empty count. The failure direction matters: a bug here should return nothing, never
  * everything.
  */

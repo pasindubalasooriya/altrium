@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Feature 3 — HR department grants (P-2.1 to P-2.5, P-9.2).
+ * Feature 3 - HR department grants (P-2.1 to P-2.5, P-9.2).
  *
  * <p>This is the conflict-of-interest control, so the tests that matter are the ones proving
  * an HR user cannot widen their own reach, and that revoking reaches them immediately rather
@@ -173,7 +173,7 @@ class HrGrantScopeTest {
         AppUser hana = org.userIn(people, "hana", Role.EMPLOYEE, Role.HR);
         org.flush();
 
-        // Granted both, including her own — but a plain grant over your own department buys
+        // Granted both, including her own - but a plain grant over your own department buys
         // nothing, which is what makes this a segregation of duties rather than a formality.
         grants.grant(hana.getId(), sales.getId(), false, null, g -> g.getId());
         grants.grant(hana.getId(), people.getId(), false, null, g -> g.getId());
@@ -187,7 +187,7 @@ class HrGrantScopeTest {
     }
 
     @Test
-    @DisplayName("P-2.4: the explicit grant lifts the own-department block — the HR Head")
+    @DisplayName("P-2.4: the explicit grant lifts the own-department block - the HR Head")
     void P_2_4_explicitGrantLiftsOwnDepartment() throws Exception {
         Department people = org.department("People");
         AppUser kevin = org.userIn(people, "kevin", Role.EMPLOYEE, Role.HR);
@@ -249,7 +249,7 @@ class HrGrantScopeTest {
                         .header("Authorization", bearer("root4")))
                 .andExpect(status().isNoContent());
 
-        // After: gone — same token, no re-login, no waiting for expiry. If the scope were
+        // After: gone - same token, no re-login, no waiting for expiry. If the scope were
         // resolved at login or cached on the authentication, this would still return 1, and
         // a revoked HR user would keep their access for the life of their token.
         mvc.perform(get(SCOPE).header("Authorization", bearer("scoped")))

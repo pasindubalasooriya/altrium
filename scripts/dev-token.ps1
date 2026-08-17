@@ -7,7 +7,7 @@
     but never issues them. This script stands in for the login screen until the React app
     exists.
 
-    It runs the same Authorization Code + PKCE flow the SPA will use — no client secret,
+    It runs the same Authorization Code + PKCE flow the SPA will use - no client secret,
     because a public client has none. It opens the Asgardeo login, listens on the redirect
     port to catch the authorization code, exchanges it for tokens, and prints the access
     token.

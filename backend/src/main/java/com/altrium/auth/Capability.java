@@ -26,7 +26,7 @@ import static com.altrium.auth.Grounds.SUPER_ADMIN;
  * </ul>
  *
  * <p>And one capability has <em>no</em> grounds at all: {@link #EXTEND_PIP_DEADLINE}. A PIP
- * deadline is immutable once set (P-5.5), so there is no actor to name — not the manager who
+ * deadline is immutable once set (P-5.5), so there is no actor to name - not the manager who
  * opened it, not HR, not the Super Admin. Modelling it as an empty set rather than leaving
  * the endpoint unbuilt means the rule is enforced rather than merely unimplemented.
  */
@@ -35,7 +35,7 @@ public enum Capability {
     // ---- Reviews (P-3) ----------------------------------------------------------------
 
     /**
-     * Seeing that a person is under review this cycle, and how far along they are — the
+     * Seeing that a person is under review this cycle, and how far along they are - the
      * roster behind "view permitted reviews", with no review content in it.
      *
      * <p>Its grounds are the union of the three read capabilities below, which is not a
@@ -53,7 +53,7 @@ public enum Capability {
      * Readable by {@code mgr(S)} and HR-in-scope <em>including author identity</em> (P-3.2).
      *
      * <p>{@link Grounds#SELF} is deliberately not listed. The subject may never receive peer
-     * text, rating, author or count, by any route (P-3.3) — so the subject has no grounds
+     * text, rating, author or count, by any route (P-3.3) - so the subject has no grounds
      * here at all, rather than grounds narrowed by a filter that someone later forgets.
      */
     READ_PEER_REVIEW(Kind.ARTIFACT, "P-3.2/P-3.3", DIRECT_MANAGER, HR_IN_SCOPE),
@@ -63,7 +63,7 @@ public enum Capability {
 
     /**
      * Exactly two peers, chosen by {@code mgr(S)} (P-1.3, P-3.6). Applied to a manager who is
-     * themselves a reviewee, this is scenario §7's "the manager's manager selects" — the same
+     * themselves a reviewee, this is scenario §7's "the manager's manager selects" - the same
      * rule one level up, not a second mechanism.
      */
     ASSIGN_PEERS(Kind.ARTIFACT, "P-1.3/P-3.6", DIRECT_MANAGER),
@@ -92,7 +92,7 @@ public enum Capability {
     /** Only {@code mgr(S)} marks a goal complete, on either plan type (P-5.2). */
     APPROVE_GOAL(Kind.ARTIFACT, "P-5.2", DIRECT_MANAGER),
 
-    /** Invisible to S until co-signed — a state gate, not a role gate (P-5.3). */
+    /** Invisible to S until co-signed - a state gate, not a role gate (P-5.3). */
     READ_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.3", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
 
     OPEN_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.7", DIRECT_MANAGER),

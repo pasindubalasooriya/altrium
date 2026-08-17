@@ -1,4 +1,4 @@
-# Seed data — the sample organisation
+# Seed data - the sample organisation
 
 A repeatable 31-person organisation across 4 departments, for manual testing.
 
@@ -7,13 +7,13 @@ cd backend
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--altrium.seed.enabled=true"
 ```
 
-Off by default, and idempotent — it checks for a known subject and skips if the organisation is already there, so restarting does not produce two of everybody.
+Off by default, and idempotent - it checks for a known subject and skips if the organisation is already there, so restarting does not produce two of everybody.
 
 Built through `OrgService`, not raw SQL, so the seed exercises the same loop rejection (P-1.4) and role normalisation (P-0.1) the API does. If it runs clean, those rules work.
 
 ## Who can actually log in
 
-Five people have real Asgardeo accounts. Everyone else carries a synthetic subject and exists only to give the hierarchy shape — nothing below the login screen can tell the difference. Passwords are in `users.md`, outside the repo.
+Five people have real Asgardeo accounts. Everyone else carries a synthetic subject and exists only to give the hierarchy shape - nothing below the login screen can tell the difference. Passwords are in `users.md`, outside the repo.
 
 | Person | Email | Role | Sits |
 |---|---|---|---|
@@ -48,12 +48,12 @@ Each of these exists to give a specific rule something to bite on. A three-perso
 
 | Feature of the seed | What it tests |
 |---|---|
-| **Leadership have no manager and no department** | P-7.2 — never reviewees, no PDP or PIP. The review chain terminates just below them. |
-| **John → Jane → Elena → Priya** | P-1.1 — direct reports only. A query that walked the chain would hand Elena access to John. |
-| **Kevin (HR Head) reports to Richard (Leadership)** | P-2.6 — the HR Head's own review is conducted from outside HR, which is what keeps the own-review block absolute (P-2.2) without leaving him unreviewed. |
-| **Hana and Rosa are HR *inside* People Operations** | P-2.3 — must be blocked in their own department without an explicit grant, and blocked from their own review whatever grant they hold (P-2.2). |
-| **Tara Fields is deactivated** | P-0.7 — must vanish from peer selection, manager lists and new cycles, while her row and history survive. |
-| **Devin is an ordinary engineer with SUPER_ADMIN** | P-9.4 — platform administration is a role, not a rank, and grants no access to review content. |
+| **Leadership have no manager and no department** | P-7.2 - never reviewees, no PDP or PIP. The review chain terminates just below them. |
+| **John → Jane → Elena → Priya** | P-1.1 - direct reports only. A query that walked the chain would hand Elena access to John. |
+| **Kevin (HR Head) reports to Richard (Leadership)** | P-2.6 - the HR Head's own review is conducted from outside HR, which is what keeps the own-review block absolute (P-2.2) without leaving him unreviewed. |
+| **Hana and Rosa are HR *inside* People Operations** | P-2.3 - must be blocked in their own department without an explicit grant, and blocked from their own review whatever grant they hold (P-2.2). |
+| **Tara Fields is deactivated** | P-0.7 - must vanish from peer selection, manager lists and new cycles, while her row and history survive. |
+| **Devin is an ordinary engineer with SUPER_ADMIN** | P-9.4 - platform administration is a role, not a rank, and grants no access to review content. |
 | **Four departments of unequal size** | HR department scoping (P-2.1) has something asymmetric to scope. |
 
 ## Resetting

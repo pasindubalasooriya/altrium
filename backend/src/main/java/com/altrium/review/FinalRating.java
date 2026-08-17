@@ -23,7 +23,7 @@ import java.time.Instant;
  * lives here; how it got here lives there.
  *
  * <p>{@code releasedAt} is the gate on the subject's own view (P-4.4). A rating that HR is
- * still normalising across the department is not the subject's to read — and because that
+ * still normalising across the department is not the subject's to read - and because that
  * is enforced as a state gate in {@code AuthorizationService}, calling the endpoint directly
  * with a known id is refused rather than merely hidden by a screen that does not render it.
  */

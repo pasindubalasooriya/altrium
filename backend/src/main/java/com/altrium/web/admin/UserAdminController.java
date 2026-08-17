@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * User and reporting-line management (feature 2). Super Admin only (P-9.1).
  *
  * <p>The role gate is expressible as an annotation here precisely because this endpoint has
- * no relationship dimension — a Super Admin manages the whole organisation. That is the
+ * no relationship dimension - a Super Admin manages the whole organisation. That is the
  * exception, not the pattern: every review and plan endpoint depends on who reports to whom,
  * which no annotation can express, and routes through the authorization component instead.
  *
@@ -86,7 +86,7 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}/direct-reports")
-    @Operation(summary = "Direct reports only — never transitive (P-1.1)")
+    @Operation(summary = "Direct reports only - never transitive (P-1.1)")
     public java.util.List<UserView> directReports(@PathVariable Long id) {
         return org.directReports(id, UserView::of);
     }
@@ -120,7 +120,7 @@ public class UserAdminController {
     }
 
     /**
-     * Soft delete (P-0.7). Never a DELETE, because nothing is deleted — the verb would
+     * Soft delete (P-0.7). Never a DELETE, because nothing is deleted - the verb would
      * misdescribe what happens and invite someone to implement the real thing later.
      */
     @PutMapping("/{id}/deactivate")

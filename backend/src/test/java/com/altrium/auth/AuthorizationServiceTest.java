@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * The denial suite for the central authorization component.
  *
  * <p>These call {@link AuthorizationService} directly rather than through an endpoint,
- * because at this point there are no review endpoints — the component is deliberately built
+ * because at this point there are no review endpoints - the component is deliberately built
  * before the features that use it. Each feature adds its own {@code MockMvc} denial tests on
  * top; what is proved here is that the rules and their <em>ordering</em> are right, which is
  * the part no per-feature test can establish on its own.
@@ -102,7 +102,7 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("P-1.1: a skip-level manager is not a manager — the relationship is never transitive")
+    @DisplayName("P-1.1: a skip-level manager is not a manager - the relationship is never transitive")
     void P_1_1_skipLevelManagerIsDenied() {
         Department engineering = org.department("Engineering");
         AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
@@ -129,7 +129,7 @@ class AuthorizationServiceTest {
 
         acting.as(priya);
 
-        // Denied at step 2, before any relationship is even considered — so this cannot be
+        // Denied at step 2, before any relationship is even considered - so this cannot be
         // undone by a reporting line, a role or a grant.
         assertDenied(() -> authorization.requireForUser(Capability.WRITE_MANAGER_REVIEW, richard.getId()));
         assertThatThrownBy(() -> authorization.requireReviewable(authorization.subject(richard.getId())))
@@ -165,7 +165,7 @@ class AuthorizationServiceTest {
 
         SubjectScope scope = authorization.subjectScopeFor(Capability.READ_PEER_REVIEW);
 
-        // An empty scope yields a false predicate — an empty page *and* a zero count, rather
+        // An empty scope yields a false predicate - an empty page *and* a zero count, rather
         // than a full count with the rows filtered out afterwards.
         assertThat(scope.isEmpty()).isTrue();
         assertThat(page(scope)).isEmpty();
@@ -209,7 +209,7 @@ class AuthorizationServiceTest {
     // ------------------------------------------------------------------ P-2 HR scoping
 
     @Nested
-    @DisplayName("HR scoping — the ordering-critical block")
+    @DisplayName("HR scoping - the ordering-critical block")
     class HrScoping {
 
         @Test
@@ -276,7 +276,7 @@ class AuthorizationServiceTest {
         }
 
         @Test
-        @DisplayName("P-0.6/P-2.2: an explicit grant still does not reach the HR Head's own review")
+        @DisplayName("P-0.6/P-2.2: an explicit grant gives the HR Head no authority over their own case")
         void P_0_6_explicitGrantCannotReachOwnReview() {
             Department peopleOps = org.department("People Operations");
             AppUser kevin = org.userIn(peopleOps, "kevin", Role.EMPLOYEE, Role.HR);
@@ -286,19 +286,50 @@ class AuthorizationServiceTest {
             acting.as(kevin);
 
             // The rule-ordering test, and the single most important assertion in the suite.
-            // Kevin's explicit grant covers his own department, and he is in it — so a model
-            // that checked the override before the self-block would permit every one of
-            // these. The self-block is decided at step 2 and the override at step 5.
-            assertDenied(() -> authorization.requireForUser(Capability.READ_MANAGER_REVIEW, kevin.getId()));
-            assertDenied(() -> authorization.requireForUser(Capability.READ_PEER_REVIEW, kevin.getId()));
+            // Kevin's explicit grant covers his own department and he is in it, so a model
+            // that checked the override before the self-block would permit all of these.
+            // The self-block is decided at step 2 and the override at step 5.
             assertDenied(() -> authorization.requireForUser(Capability.CALIBRATE_RATING, kevin.getId()));
-            assertDenied(() -> authorization.requireForUser(Capability.READ_DEVELOPMENT_PLAN, kevin.getId()));
             assertDenied(() -> authorization.requireForUser(Capability.COSIGN_IMPROVEMENT_PLAN, kevin.getId()));
+            assertDenied(() -> authorization.requireForUser(Capability.RECORD_WITNESS, kevin.getId()));
+
+            // And the peer feedback written about him stays out of reach - not because he is
+            // HR, but because no subject ever reads it (P-3.3). His HR grant is what might
+            // have let him around that, and does not.
+            assertDenied(() -> authorization.requireForUser(Capability.READ_PEER_REVIEW, kevin.getId()));
         }
 
         @Test
-        @DisplayName("P-2.2: the HR Head's own row is absent from a list their grant covers")
-        void P_2_2_ownRowExcludedFromScopedList() {
+        @DisplayName("P-2.2/P-4.4: the HR Head reads their own rating as an employee, like anyone else")
+        void P_2_2_hrReadsOwnRatingAsAnEmployee() {
+            Department peopleOps = org.department("People Operations");
+            AppUser richard = org.user("richard", Role.EMPLOYEE, Role.LEADERSHIP);
+            AppUser kevin = org.userIn(peopleOps, "kevin", Role.EMPLOYEE, Role.HR);
+            kevin.setManager(richard);
+            org.flush();
+            grants.grant(kevin.getId(), peopleOps.getId(), true, null, g -> g.getId());
+
+            acting.as(kevin);
+            ReviewSubject self = authorization.subject(kevin.getId());
+
+            // P-2.2 withholds HR authority over his own case, not his ordinary rights. His
+            // review is conducted by Leadership (P-2.6); withholding the outcome from him
+            // would make that review pointless. Note the grounds: SELF, never HR_IN_SCOPE.
+            assertThat(authorization.require(Capability.READ_FINAL_RATING, self,
+                    ArtifactState.released(true))).isEqualTo(Grounds.SELF);
+            assertThat(authorization.requireForUser(Capability.READ_MANAGER_REVIEW, kevin.getId()))
+                    .isEqualTo(Grounds.SELF);
+            assertThat(authorization.requireForUser(Capability.READ_DEVELOPMENT_PLAN, kevin.getId()))
+                    .isEqualTo(Grounds.SELF);
+
+            // The release gate binds him exactly as it binds everyone.
+            assertDenied(() -> authorization.require(Capability.READ_FINAL_RATING, self,
+                    ArtifactState.released(false)));
+        }
+
+        @Test
+        @DisplayName("P-2.2: the HR Head's own row reaches them as theirs, never through their grant")
+        void P_2_2_ownRowComesFromSelfNotFromTheGrant() {
             Department peopleOps = org.department("People Operations");
             AppUser kevin = org.userIn(peopleOps, "kevin", Role.EMPLOYEE, Role.HR);
             AppUser samuel = org.userIn(peopleOps, "samuel", Role.EMPLOYEE);
@@ -308,13 +339,22 @@ class AuthorizationServiceTest {
 
             acting.as(kevin);
 
-            Page<AppUser> visible = page(authorization.subjectScopeFor(Capability.READ_MANAGER_REVIEW));
+            // Where the capability admits SELF, his own row is there - as his own record.
+            Page<AppUser> readable = page(authorization.subjectScopeFor(Capability.READ_MANAGER_REVIEW));
+            assertThat(readable).extracting(AppUser::getId)
+                    .containsExactlyInAnyOrder(kevin.getId(), samuel.getId(), hana.getId());
+            assertThat(readable.getTotalElements()).isEqualTo(3);
 
-            assertThat(visible).extracting(AppUser::getId)
+            // Where it does not, his own row drops out entirely - which is the proof that it
+            // was never his grant carrying it. READ_PEER_REVIEW has no SELF grounds, and his
+            // explicit grant covers his own department, so only the not-equal term in the
+            // WHERE clause can be excluding him here.
+            Page<AppUser> peerVisible = page(authorization.subjectScopeFor(Capability.READ_PEER_REVIEW));
+            assertThat(peerVisible).extracting(AppUser::getId)
                     .containsExactlyInAnyOrder(samuel.getId(), hana.getId())
                     .doesNotContain(kevin.getId());
             // The count agrees with the rows. Filtering in Java would have made it 3.
-            assertThat(visible.getTotalElements()).isEqualTo(2);
+            assertThat(peerVisible.getTotalElements()).isEqualTo(2);
         }
 
         @Test
@@ -436,7 +476,7 @@ class AuthorizationServiceTest {
         assertThat(authorization.require(Capability.READ_IMPROVEMENT_PLAN, subject,
                 ArtifactState.cosigned(true))).isEqualTo(Grounds.SELF);
 
-        // The gate binds the subject only — the manager drafting it must be able to see it.
+        // The gate binds the subject only - the manager drafting it must be able to see it.
         acting.as(elena);
         assertThat(authorization.require(Capability.READ_IMPROVEMENT_PLAN,
                 authorization.subject(john.getId()), ArtifactState.cosigned(false)))
@@ -475,7 +515,7 @@ class AuthorizationServiceTest {
         org.flush();
         grants.grant(hana.getId(), engineering.getId(), false, null, g -> g.getId());
 
-        // Modelled as a capability nobody holds, rather than an endpoint nobody wrote —
+        // Modelled as a capability nobody holds, rather than an endpoint nobody wrote -
         // so it is enforced rather than merely unimplemented.
         for (AppUser actor : List.of(elena, hana, devin, john)) {
             acting.as(actor);
@@ -503,7 +543,7 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("P-7.3/P-2.6: Leadership reviews the HR Head — as their manager, not as Leadership")
+    @DisplayName("P-7.3/P-2.6: Leadership reviews the HR Head - as their manager, not as Leadership")
     void P_7_3_leadershipReviewsTheHrHeadAsTheirManager() {
         Department peopleOps = org.department("People Operations");
         AppUser richard = org.user("richard", Role.EMPLOYEE, Role.LEADERSHIP);
@@ -541,7 +581,7 @@ class AuthorizationServiceTest {
         assertDenied(() -> authorization.requireForUser(Capability.READ_IMPROVEMENT_PLAN, john.getId()));
 
         // Their scoped list contains exactly one person: themselves. Administering the
-        // platform is a role, not a place in the hierarchy — Devin is an ordinary engineer
+        // platform is a role, not a place in the hierarchy - Devin is an ordinary engineer
         // with his own self-review (P-0.1), and the Super Admin role adds nobody else to it.
         assertThat(page(authorization.subjectScopeFor(Capability.READ_SELF_REVIEW)))
                 .extracting(AppUser::getId)
@@ -593,7 +633,7 @@ class AuthorizationServiceTest {
 
         assertDenied(() -> authorization.requireForUser(Capability.READ_SELF_REVIEW, john.getId()));
         assertDenied(() -> authorization.requireForUser(Capability.WRITE_SELF_REVIEW, tara.getId()));
-        // The row is still there — the history and carry-over pillar depends on it.
+        // The row is still there - the history and carry-over pillar depends on it.
         assertThat(users.findById(tara.getId())).isPresent();
     }
 
@@ -675,7 +715,7 @@ class AuthorizationServiceTest {
     @Test
     @DisplayName("P-9.4/P-7.1: no review capability is reachable by the Super Admin or Leadership")
     void P_9_4_noReviewCapabilityListsSuperAdminOrLeadership() {
-        // Structural rather than behavioural, so it holds for capabilities added later too —
+        // Structural rather than behavioural, so it holds for capabilities added later too -
         // which is what a per-capability test cannot do. If someone adds a review capability
         // and reaches for SUPER_ADMIN to make an admin screen work, this fails.
         for (Capability capability : Capability.values()) {

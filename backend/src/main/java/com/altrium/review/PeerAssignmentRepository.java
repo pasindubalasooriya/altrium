@@ -7,7 +7,7 @@ public interface PeerAssignmentRepository
         extends JpaRepository<PeerAssignment, Long>, JpaSpecificationExecutor<PeerAssignment> {
 
     /**
-     * Answers "is this caller an assigned peer of this subject?" — the fact behind
+     * Answers "is this caller an assigned peer of this subject?" - the fact behind
      * {@code ASSIGNED_PEER} (P-3.4).
      *
      * <p>It takes the peer id as an argument rather than listing a subject's peers, so it

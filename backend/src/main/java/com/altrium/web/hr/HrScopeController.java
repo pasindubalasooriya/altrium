@@ -41,7 +41,7 @@ public class HrScopeController {
 
     /**
      * @param ownDepartmentExcluded true when the caller's own department is deliberately
-     *                              outside their scope (P-2.3) — the ordinary HR case, and
+     *                              outside their scope (P-2.3) - the ordinary HR case, and
      *                              the thing most likely to look like a bug if unexplained
      * @param note                  a plain-language reason, so the rule is legible in the UI
      */

@@ -46,7 +46,7 @@ public class SeedData implements ApplicationRunner {
 
     /**
      * The five people with real Asgardeo accounts, who can actually log in through the UI.
-     * The rest carry synthetic subjects — creating 30 real accounts by hand would be console
+     * The rest carry synthetic subjects - creating 30 real accounts by hand would be console
      * work for no testing gain, and nothing below the login screen can tell the difference.
      */
     private static final String SUB_JOHN = "cdb99960-4f43-4892-81ac-92f46d8ee260";
@@ -77,7 +77,7 @@ public class SeedData implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         // The two halves are guarded separately so an existing organisation can still gain
-        // its HR grants — the grants arrived a feature later than the people did.
+        // its HR grants - the grants arrived a feature later than the people did.
         if (users.existsByAsgardeoSubject(SUB_RICHARD)) {
             log.info("Sample organisation already present; skipping people.");
             loadExistingIds();
@@ -118,7 +118,7 @@ public class SeedData implements ApplicationRunner {
 
         // Platform administration is a role, not a place in the hierarchy: Devin is an
         // ordinary engineer who also administers the system. Crucially that grants no access
-        // to review content (P-9.4) — a useful thing to be able to demonstrate.
+        // to review content (P-9.4) - a useful thing to be able to demonstrate.
         person("devin", SUB_DEVIN, "Devin Marsh", engineering, "elena", Role.SUPER_ADMIN);
 
         // Deactivated (P-0.7): must disappear from peer selection, manager lists and new
@@ -148,7 +148,7 @@ public class SeedData implements ApplicationRunner {
         person("kevin", SUB_KEVIN, "Kevin Doyle", peopleOps, "richard", Role.HR, Role.MANAGER);
 
         // Ordinary HR, deliberately inside the department they would otherwise oversee.
-        // Without an explicit grant they must be blocked here (P-2.3) — and blocked from
+        // Without an explicit grant they must be blocked here (P-2.3) - and blocked from
         // their own review no matter what grant they hold (P-2.2).
         person("hana", null, "Hana Iqbal", peopleOps, "kevin", Role.HR);
         person("rosa", null, "Rosa Delgado", peopleOps, "kevin", Role.HR);
@@ -184,7 +184,7 @@ public class SeedData implements ApplicationRunner {
 
         // Kevin is the HR Head: an explicit grant over his own department (P-2.4), which is
         // how People Operations' reviews get overseen at all. It still leaves his own review
-        // out of reach (P-2.2) — that block has no override.
+        // out of reach (P-2.2) - that block has no override.
         hrGrants.grant(kevin, peopleOps, true, null, g -> g.getId());
 
         // Hana oversees two departments, neither of them her own. The ordinary case.

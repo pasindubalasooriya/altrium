@@ -12,26 +12,26 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Works out which departments the calling HR user may act in — freshly, on every request.
+ * Works out which departments the calling HR user may act in - freshly, on every request.
  *
  * <p><strong>Request-scoped by design, and this is the point of the class.</strong> P-2.5
  * requires that a grant change apply on the caller's very next request. Caching the answer at
  * login, or on the authentication, or in the JWT, would leave a revoked HR user operating in
- * a department they no longer hold until their token expired — which for a
+ * a department they no longer hold until their token expired - which for a
  * conflict-of-interest control is the whole failure mode. The lookup is memoised for the
  * duration of one request and thrown away with it, so a single request stays internally
  * consistent without any decision outliving it.
  *
  * <p>Two of the three HR rules are applied here, in order:
  * <ol>
- *   <li><b>P-2.1</b> — only granted departments count.</li>
- *   <li><b>P-2.3</b> — the caller's own department is removed.</li>
- *   <li><b>P-2.4</b> — unless that grant carries the explicit flag, which puts it back.</li>
+ *   <li><b>P-2.1</b> - only granted departments count.</li>
+ *   <li><b>P-2.3</b> - the caller's own department is removed.</li>
+ *   <li><b>P-2.4</b> - unless that grant carries the explicit flag, which puts it back.</li>
  * </ol>
  *
  * <p>The third rule, <b>P-2.2</b>, is deliberately absent. The own-review block concerns who
  * the <em>subject</em> of an artifact is, not which department it belongs to, so it cannot be
- * expressed as a department set and must be checked separately — and first. Folding it in
+ * expressed as a department set and must be checked separately - and first. Folding it in
  * here would produce exactly the ordering bug P-0.6 warns about: an HR Head whose explicit
  * grant covers their own department would reach their own review.
  */
@@ -63,7 +63,7 @@ public class HrScopeResolver {
         CurrentUser caller = currentUser.find().orElse(null);
 
         // Only HR hold a department scope. A manager's authority comes from who reports to
-        // them, and Leadership see aggregates only — neither is expressed in these grants.
+        // them, and Leadership see aggregates only - neither is expressed in these grants.
         if (caller == null || !caller.hasRole(Role.HR)) {
             return HrScope.NONE;
         }

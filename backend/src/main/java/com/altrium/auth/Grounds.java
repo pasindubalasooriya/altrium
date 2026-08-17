@@ -1,7 +1,7 @@
 package com.altrium.auth;
 
 /**
- * The reason an action was permitted — never a role, always a relationship or a scope.
+ * The reason an action was permitted - never a role, always a relationship or a scope.
  *
  * <p>Recording <em>why</em> rather than just <em>whether</em> is what makes the model
  * auditable. "Permitted" tells you nothing; "permitted as the subject's direct manager"
@@ -15,7 +15,7 @@ public enum Grounds {
     /** The caller is the subject. Bounded by state gates: P-4.4 and P-5.3 both bite here. */
     SELF,
 
-    /** {@code mgr(S) = A} (P-1.1). Direct reports only — never transitive, never skip-level. */
+    /** {@code mgr(S) = A} (P-1.1). Direct reports only - never transitive, never skip-level. */
     DIRECT_MANAGER,
 
     /**
@@ -34,15 +34,15 @@ public enum Grounds {
      * The C-suite, acting as the C-suite. Carries aggregate metrics only (P-7.1) and is
      * never grounds for reading an individual artifact.
      *
-     * <p>Where a Leadership member reviews the tier below them — including the HR Head
-     * (P-2.6, P-7.3) — they do so as {@link #DIRECT_MANAGER}, because that is what they are.
+     * <p>Where a Leadership member reviews the tier below them - including the HR Head
+     * (P-2.6, P-7.3) - they do so as {@link #DIRECT_MANAGER}, because that is what they are.
      * Scenario §7 needs no separate mechanism.
      */
     LEADERSHIP,
 
     /**
      * Platform administration: users, org structure, grants, cycle configuration (P-9.1 to
-     * P-9.3). Never grounds for review, rating or plan content (P-9.4) — the Super Admin
+     * P-9.3). Never grounds for review, rating or plan content (P-9.4) - the Super Admin
      * grants HR their departments, so reading on top of that would make the role omnipotent.
      */
     SUPER_ADMIN,

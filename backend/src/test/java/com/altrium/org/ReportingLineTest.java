@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Feature 2 — reporting lines (P-1.4) and soft delete (P-0.7).
+ * Feature 2 - reporting lines (P-1.4) and soft delete (P-0.7).
  *
  * <p>The loop check is not tidiness. Every direct-reports query and every chain walk in the
  * authorization layer assumes the reporting graph is acyclic; a cycle makes traversal
@@ -140,7 +140,7 @@ class ReportingLineTest {
         OrgService.DeactivationResult result = org.deactivate(boss.getId());
 
         assertThat(result.user().isActive()).isFalse();
-        // The row survives — deleting it would orphan every artifact they authored and
+        // The row survives - deleting it would orphan every artifact they authored and
         // destroy the history the carry-over feature depends on.
         assertThat(users.findById(boss.getId())).isPresent();
         // Reports are left dangling on purpose rather than silently re-pointed: guessing a

@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>This class exists because of a bug the rest of the suite could not see. Every other
  * integration test is {@code @Transactional}, which keeps a Hibernate session open for the
- * whole test — so mapping an entity to a DTO after the service transaction had closed
+ * whole test - so mapping an entity to a DTO after the service transaction had closed
  * worked there, and failed with {@code LazyInitializationException} the moment a real
  * request did it. The tests passed; the endpoint returned 500.
  *

@@ -24,13 +24,13 @@ import java.util.Set;
 /**
  * Turns a validated Asgardeo JWT into an Altrium principal.
  *
- * <p>Asgardeo answers "who is this?" — it authenticates, and its signature is what makes the
+ * <p>Asgardeo answers "who is this?" - it authenticates, and its signature is what makes the
  * {@code sub} claim trustworthy. It does not answer "what may they do here?". That is decided
  * against the database, for two reasons:
  *
  * <ol>
  *   <li>A JWT keeps the claims it was minted with until it expires. Deriving authorities from
- *       the token would mean a revoked role stayed live for the rest of the token's lifetime —
+ *       the token would mean a revoked role stayed live for the rest of the token's lifetime -
  *       exactly the staleness P-2.5 forbids for HR grants. Resolving per request means a role
  *       change applies on the caller's very next request.</li>
  *   <li>The authorization layer must also reason about <em>other</em> users' roles (P-1.5,
@@ -109,7 +109,7 @@ public class AltriumJwtAuthenticationConverter
     /**
      * Every provisioned, active principal is an Employee in addition to any other role
      * (P-0.1). Granting it here rather than relying on the row existing makes the rule
-     * structural — a seeding slip cannot leave someone without it.
+     * structural - a seeding slip cannot leave someone without it.
      */
     private Collection<GrantedAuthority> authoritiesOf(AppUser user) {
         Set<GrantedAuthority> authorities = new LinkedHashSet<>();

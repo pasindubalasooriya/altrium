@@ -23,7 +23,7 @@ import java.util.List;
  *
  * <p>Absent sections are {@code null} and are omitted from the JSON rather than sent empty.
  * Returning {@code "peerReviews": []} to a subject would tell them the peer table exists and
- * that nobody had written yet — which is itself something they are not entitled to know
+ * that nobody had written yet - which is itself something they are not entitled to know
  * (P-3.3).
  */
 public final class ReviewDtos {
@@ -57,7 +57,7 @@ public final class ReviewDtos {
     }
 
     /**
-     * One row of the review list. Carries progress, never content — a manager scanning their
+     * One row of the review list. Carries progress, never content - a manager scanning their
      * team sees who has submitted, and opens the record to read anything at all.
      */
     public record ReviewSummary(
@@ -135,7 +135,7 @@ public final class ReviewDtos {
     /**
      * One reviewee's record, containing only the sections the caller had grounds for.
      *
-     * @param visibleSections what the caller can see, named — so a client can render
+     * @param visibleSections what the caller can see, named - so a client can render
      *                        honestly ("you cannot see peer feedback") instead of guessing
      *                        from nulls, and so a denial is legible rather than mysterious
      */

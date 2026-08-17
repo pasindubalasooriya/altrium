@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Feature 4 — reading the reviews a caller is permitted to see.
+ * Feature 4 - reading the reviews a caller is permitted to see.
  *
  * <p>This is the first feature to sit on {@link AuthorizationService}, and it is deliberately
  * read-only: getting the visibility rules right is a whole problem by itself, and mixing
@@ -29,14 +29,14 @@ import java.util.function.Function;
  * <ul>
  *   <li><b>Lists</b> are scoped by {@link SubjectScope} pushed into the SQL. A page the
  *       caller may not see never leaves the database, so the pagination count is right for
- *       free — which it is not if the rows are filtered in Java afterwards (P-0.3).</li>
+ *       free - which it is not if the rows are filtered in Java afterwards (P-0.3).</li>
  *   <li><b>Single records</b> are re-checked by a point decision on the way out, so an id
  *       copied from somebody else's screen is refused rather than served (P-0.4).</li>
  * </ul>
  *
  * <p>The detail view is assembled <em>per section</em>, each behind its own decision, rather
  * than fetched whole and trimmed. The subject's own bundle is then not a redacted version of
- * the manager's — the peer section is simply never built for them, and the query behind it
+ * the manager's - the peer section is simply never built for them, and the query behind it
  * never runs (P-3.3).
  */
 @Service
@@ -90,7 +90,7 @@ public class ReviewReadService {
      * One reviewee's record, containing exactly the sections this caller has grounds for.
      *
      * <p>Every section is decided separately. A subject reading their own record gets their
-     * self-review and, once released, their rating and their manager's feedback — and the
+     * self-review and, once released, their rating and their manager's feedback - and the
      * peer query is not merely filtered but never issued.
      */
     @Transactional(readOnly = true)
@@ -161,7 +161,7 @@ public class ReviewReadService {
                 .orElseThrow(() -> new NotFoundApiException("No such cycle"));
     }
 
-    /** Which grounds, if any, this caller holds — used to decide whether to build a section. */
+    /** Which grounds, if any, this caller holds - used to decide whether to build a section. */
     private boolean mayRead(Capability capability, ReviewSubject subject) {
         return authorization.decide(capability, subject, ArtifactState.none()).permitted();
     }

@@ -69,7 +69,7 @@ public class HrGrantAdminController {
             @NotNull Long hrUserId,
             @NotNull Long departmentId,
             /*
-             * Lifts the own-department block for this pairing only (P-2.4) — the HR Head
+             * Lifts the own-department block for this pairing only (P-2.4) - the HR Head
              * mechanism. It never lifts the own-review block (P-2.2), which has no override.
              */
             boolean explicitGrant) {

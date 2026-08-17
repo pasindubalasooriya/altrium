@@ -48,8 +48,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
     Page<AppUser> findAll(Specification<AppUser> spec, Pageable pageable);
 
     /**
-     * Loads everything an authorization decision needs about a reviewee — roles for P-1.5,
-     * department for P-2.1, manager for P-1.1 — in one query.
+     * Loads everything an authorization decision needs about a reviewee - roles for P-1.5,
+     * department for P-2.1, manager for P-1.1 - in one query.
      *
      * <p>Join fetching is safe here because this returns a single row, not a page. It is
      * also necessary: the decision runs outside any transaction the caller may have opened,
@@ -83,7 +83,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
     boolean existsByEmail(String email);
 
     /**
-     * Direct reports only (P-1.1) — never transitive. The whole manager side of the
+     * Direct reports only (P-1.1) - never transitive. The whole manager side of the
      * authorization model is built on this one relationship.
      */
     List<AppUser> findByManagerId(Long managerId);

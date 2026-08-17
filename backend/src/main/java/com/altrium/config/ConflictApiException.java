@@ -2,7 +2,7 @@ package com.altrium.config;
 
 /**
  * A request the caller is entitled to make, refused because it conflicts with what is
- * already recorded — a duplicate email, a second peer submission (P-3.5). Surfaces as
+ * already recorded - a duplicate email, a second peer submission (P-3.5). Surfaces as
  * **409**.
  *
  * <p>Deliberately not 403. The blanket "denials return 403" rule governs *access* decisions;

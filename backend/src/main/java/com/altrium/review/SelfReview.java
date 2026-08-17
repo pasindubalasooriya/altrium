@@ -19,7 +19,7 @@ import java.time.Instant;
  *
  * <p>There is no rating field, and its absence is deliberate rather than an omission. The
  * scenario never has an employee rate themselves, and a nullable rating column is an
- * invitation — some later screen would populate it, and then a self-assigned number would
+ * invitation - some later screen would populate it, and then a self-assigned number would
  * be sitting next to a manager-assigned one with nothing explaining the difference.
  */
 @Entity

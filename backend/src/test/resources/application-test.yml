@@ -18,7 +18,7 @@ spring:
     locations: classpath:db/migration
 
 # No Asgardeo tenant is contacted in tests. A stub JwtDecoder stands in, so the real filter
-# chain and the real AltriumJwtAuthenticationConverter still run — which is the point:
+# chain and the real AltriumJwtAuthenticationConverter still run - which is the point:
 # denial tests must exercise the actual security path, not a mock of it.
 #
 # The real decoder is switched off explicitly. Omitting issuer-uri here would not work: a

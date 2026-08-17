@@ -10,7 +10,7 @@ import java.util.Optional;
  * The single way to ask "who is calling?".
  *
  * <p>Reads the {@link CurrentUser} the JWT converter already resolved, so this costs nothing
- * — no repeated database lookup per authorization decision, and no risk of two decisions in
+ * - no repeated database lookup per authorization decision, and no risk of two decisions in
  * one request disagreeing about who the caller is.
  */
 @Service

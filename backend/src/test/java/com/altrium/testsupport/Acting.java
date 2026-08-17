@@ -16,12 +16,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>The principal is built by the <em>real</em> {@link AltriumJwtAuthenticationConverter},
  * not hand-assembled. A test that constructed its own {@code CurrentUser} would prove the
  * service is consistent with the test's idea of a caller rather than with the one production
- * actually produces — and the converter is where roles come from the database rather than the
+ * actually produces - and the converter is where roles come from the database rather than the
  * token, which several of these tests depend on.
  *
  * <p>Each call also starts a <strong>fresh request scope</strong>. That is not incidental
- * bookkeeping: {@code HrScopeResolver} memoises per request, so switching callers — or
- * re-acting as the same caller after a grant changes — must discard it. Tests that assert
+ * bookkeeping: {@code HrScopeResolver} memoises per request, so switching callers - or
+ * re-acting as the same caller after a grant changes - must discard it. Tests that assert
  * P-2.5 rely on this being genuinely per-request.
  */
 @Component

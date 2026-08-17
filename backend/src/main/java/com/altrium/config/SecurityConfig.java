@@ -17,11 +17,11 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
  * Resource-server configuration.
  *
  * <p>Asgardeo is the identity provider (decided; do not substitute). The backend never sees a
- * password and holds no shared secret — it validates each JWT's signature against the
+ * password and holds no shared secret - it validates each JWT's signature against the
  * tenant's JWKS endpoint, which Spring discovers from {@code issuer-uri}.
  *
- * <p>What is configured here is only the coarse gate. The real model — direct reports,
- * department scoping, peer anonymity, the HR self-exclusion rules — cannot be expressed as
+ * <p>What is configured here is only the coarse gate. The real model - direct reports,
+ * department scoping, peer anonymity, the HR self-exclusion rules - cannot be expressed as
  * URL patterns, because whether a manager may open a review depends on who that employee
  * reports to, not on the caller holding the Manager role. That lives in the authorization
  * component and in the queries themselves.
@@ -70,7 +70,7 @@ public class SecurityConfig {
     }
 
     /**
-     * Denials that never reach a controller — rejected in the filter chain — still have to
+     * Denials that never reach a controller - rejected in the filter chain - still have to
      * look identical to the ones that do, or the difference itself becomes a signal.
      */
     private AccessDeniedHandler forbiddenHandler() {

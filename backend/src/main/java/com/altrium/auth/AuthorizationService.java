@@ -21,20 +21,27 @@ import java.util.Set;
  *
  * <h2>The evaluation order (P-0.6)</h2>
  * <ol>
- *   <li><b>Authenticated</b> — a provisioned, active Altrium user</li>
- *   <li><b>Absolute self-blocks</b> — P-2.2 and P-1.5, which nothing later can undo</li>
- *   <li><b>Role gate</b> — does any actor hold this capability at all?</li>
- *   <li><b>Relationship and scope</b> — P-1.1 direct reports, P-2.1/P-2.3 HR departments</li>
- *   <li><b>Explicit-grant override</b> — P-2.4, applied inside {@link HrScopeResolver}</li>
- *   <li><b>State gates</b> — P-5.3 co-sign, P-4.4 release</li>
+ *   <li><b>Authenticated</b> - a provisioned, active Altrium user</li>
+ *   <li><b>Absolute self-blocks</b> - P-2.2 and P-1.5, which nothing later can undo</li>
+ *   <li><b>Role gate</b> - does any actor hold this capability at all?</li>
+ *   <li><b>Relationship and scope</b> - P-1.1 direct reports, P-2.1/P-2.3 HR departments</li>
+ *   <li><b>Explicit-grant override</b> - P-2.4, applied inside {@link HrScopeResolver}</li>
+ *   <li><b>State gates</b> - P-5.3 co-sign, P-4.4 release</li>
  * </ol>
  *
  * <p><strong>Step 5 can never reach past step 2, and that is the whole design.</strong> The
  * explicit-grant flag lifts the own-<em>department</em> block only. Were the override checked
- * before the self-block — the natural order if you write the rules as you read them in
- * scenario §3 — an HR Head holding an explicit grant over their own department would reach
+ * before the self-block - the natural order if you write the rules as you read them in
+ * scenario §3 - an HR Head holding an explicit grant over their own department would reach
  * their own review, marking their own homework. Step 2 removes HR grounds outright when the
  * caller is the subject, and steps 4 and 5 can only choose among the grounds that survive.
+ *
+ * <p>What step 2 removes is HR <em>authority</em> over one's own case, not the ordinary
+ * rights of the person who happens to hold the role. An HR user is an employee as well
+ * (P-0.1), so they read their own rating and manager feedback exactly as anyone does - while
+ * remaining unable to calibrate that rating, co-sign their own PIP, or see the peer feedback
+ * written about them. The distinction is the point: this is a conflict-of-interest control,
+ * not a penalty for working in HR.
  *
  * <p>The two halves of the API answer different questions and both are needed. {@link
  * #require} decides about one artifact; {@link #subjectScopeFor} produces the predicate for a
@@ -61,7 +68,7 @@ public class AuthorizationService {
     // ================================================================= point decisions
 
     /**
-     * Decides, and throws on denial. The form every caller should use — a decision that must
+     * Decides, and throws on denial. The form every caller should use - a decision that must
      * be inspected to take effect is a decision somebody will eventually forget to inspect.
      *
      * @throws AccessDeniedApiException always surfacing as 403 with an opaque body (P-0.5)
@@ -140,7 +147,7 @@ public class AuthorizationService {
      * The {@code WHERE} clause for a list of artifacts, resolved for this request.
      *
      * <p>Pass the result to {@link SubjectScopeSpecification#subjectsIn}. Any state gate the
-     * capability carries — the PIP co-sign gate, rating release — is <em>not</em> in here and
+     * capability carries - the PIP co-sign gate, rating release - is <em>not</em> in here and
      * must be ANDed on by the feature that owns that column, because this class does not know
      * the shape of those tables. What is in here is the access predicate, identically for
      * every artifact type.
@@ -152,13 +159,16 @@ public class AuthorizationService {
             throw new AccessDeniedApiException("P-0.7: caller " + caller.id() + " is deactivated");
         }
 
-        // P-2.2 again, in the shape a list needs. An HR user is the subject of exactly one
-        // row in any artifact table — their own — and it must not appear even when their
-        // grants would otherwise cover it. Dropping their own row here mirrors the point
-        // decision below; the two must agree or the list and the detail view disagree.
+        // Self appears whenever the capability admits it - an HR user is an employee too, and
+        // sees their own record on the same terms as anyone (P-0.1, P-4.4).
+        //
+        // P-2.2 still applies to the list, but on the HR branch only: see SubjectScope, where
+        // the caller's own id is a not-equal term on the department predicate. So an HR user's
+        // own row reaches them as *theirs*, never as something their grant covers. The
+        // difference is visible on READ_PEER_REVIEW, which has no SELF grounds at all: their
+        // own row drops out of that list entirely, which is exactly right (P-3.3).
         boolean hrCaller = caller.hasRole(Role.HR);
-        boolean includeSelf = capability.allows(Grounds.SELF)
-                && !(hrCaller && capability.concernsReviewContent());
+        boolean includeSelf = capability.allows(Grounds.SELF);
 
         Set<Long> reportIds = capability.allows(Grounds.DIRECT_MANAGER)
                 ? Set.copyOf(users.findIdsByManagerId(caller.id()))
@@ -212,23 +222,23 @@ public class AuthorizationService {
         // Nothing below this point can undo either of these.
 
         if (capability.concernsReviewContent() && subject.leadership()) {
-            // P-1.5 / P-7.2. Not "hidden from Leadership" — no such artifact exists.
+            // P-1.5 / P-7.2. Not "hidden from Leadership" - no such artifact exists.
             return AuthorizationDecision.deny("P-1.5", "Leadership is never a reviewee");
         }
 
         // P-2.2, the own-review block. Decided here, at step 2, precisely so that the
-        // explicit-grant override at step 5 cannot reach it. An HR user is blocked from their
-        // own review, rating and plan by every route, holding any grant, wearing any flag.
+        // explicit-grant override at step 5 cannot reach it - an HR user's grants, however
+        // wide and whatever flag they carry, never apply to their own case.
         //
-        // Note the consequence, which is deliberate and follows the policy as written: this
-        // also withholds an HR user's own final rating from them (P-4.4's employee right),
-        // because P-2.2 says "any review, rating or plan where they are S" with no carve-out.
-        // Their review still happens — Leadership conduct it (P-2.6) — and if the client
-        // wants them to see its result, that is a change to P-2.2, made here, in one place.
-        if (callerIsSubject && caller.hasRole(Role.HR) && capability.concernsReviewContent()) {
-            return AuthorizationDecision.deny("P-2.2",
-                    "HR user " + caller.id() + " is the subject; the own-review block is absolute");
-        }
+        // What it removes is HR *authority*, not the person's ordinary rights. An HR user is
+        // still an employee (P-0.1), so they read their own final rating and manager feedback
+        // on exactly the terms everyone else does (P-4.4) - the alternative would leave the
+        // HR Head reviewed by Leadership under P-2.6 and never told the outcome. What they
+        // cannot do is act as HR upon themselves: calibrate their own rating, co-sign their
+        // own PIP, or read the peer feedback written about them, which no subject ever sees
+        // (P-3.3). Those all sit behind HR_IN_SCOPE, which is what this flag withholds.
+        boolean hrGroundsBlocked =
+                callerIsSubject && caller.hasRole(Role.HR) && capability.concernsReviewContent();
 
         // ---- Step 3: role gate --------------------------------------------------------
         if (capability.grounds().isEmpty()) {
@@ -240,7 +250,7 @@ public class AuthorizationService {
         }
 
         // ---- Steps 4 and 5: relationship, scope, and the explicit-grant override -------
-        Grounds grounds = groundsFor(capability, caller, subject, departmentId, state);
+        Grounds grounds = groundsFor(capability, caller, subject, departmentId, state, hrGroundsBlocked);
         if (grounds == null) {
             return AuthorizationDecision.deny(capability.policy(),
                     "caller " + caller.id() + " holds no grounds for " + capability
@@ -253,14 +263,15 @@ public class AuthorizationService {
 
     /**
      * Steps 4 and 5. Grounds are tried in a fixed order and the first match wins, so a
-     * decision always has exactly one justification — a manager who is also HR is recorded as
+     * decision always has exactly one justification - a manager who is also HR is recorded as
      * acting as the manager, which is the stronger and more specific relationship.
      */
     private Grounds groundsFor(Capability capability,
                                CurrentUser caller,
                                ReviewSubject subject,
                                Long departmentId,
-                               ArtifactState state) {
+                               ArtifactState state,
+                               boolean hrGroundsBlocked) {
 
         boolean callerIsSubject = subject != null && caller.is(subject.id());
 
@@ -275,7 +286,7 @@ public class AuthorizationService {
         }
 
         // P-1.1: direct reports only. This is also how a Leadership member reviews the tier
-        // below them, including the HR Head (P-2.6, P-7.3) — as that person's manager, which
+        // below them, including the HR Head (P-2.6, P-7.3) - as that person's manager, which
         // is what they are. Scenario §7 needs no second mechanism.
         if (capability.allows(Grounds.DIRECT_MANAGER) && subject != null && subject.isManagedBy(caller.id())) {
             return Grounds.DIRECT_MANAGER;
@@ -283,9 +294,11 @@ public class AuthorizationService {
 
         // P-2.1 and P-2.3, with P-2.4 already applied: HrScopeResolver returns the granted
         // departments minus the caller's own, unless that grant carries the explicit flag.
-        // Step 5 of the order is inside that resolver, and it is reached only here — after
-        // the step-2 block has had its say.
+        // Step 5 of the order is inside that resolver, and it is reached only here - after
+        // the step-2 block has had its say. hrGroundsBlocked is that block: when the caller
+        // is the subject, no grant reaches this line, so the override cannot restore it.
         if (capability.allows(Grounds.HR_IN_SCOPE)
+                && !hrGroundsBlocked
                 && caller.hasRole(Role.HR)
                 && hrScope.resolve().covers(departmentId)) {
             return Grounds.HR_IN_SCOPE;
@@ -308,7 +321,7 @@ public class AuthorizationService {
 
     /**
      * Step 6. State gates constrain the subject only. A manager and HR must be able to see a
-     * PIP before it is co-signed — somebody has to draft and check it — and a manager must be
+     * PIP before it is co-signed - somebody has to draft and check it - and a manager must be
      * able to see a rating before it is released, since they are the one setting it.
      */
     private AuthorizationDecision stateGate(Capability capability, Grounds grounds, ArtifactState state) {

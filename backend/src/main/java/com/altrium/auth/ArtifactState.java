@@ -1,7 +1,7 @@
 package com.altrium.auth;
 
 /**
- * The facts about an artifact's <em>state</em> that a decision depends on — step 6 of the
+ * The facts about an artifact's <em>state</em> that a decision depends on - step 6 of the
  * P-0.6 evaluation order.
  *
  * <p>These are separated from the caller's relationship to the subject because they answer a

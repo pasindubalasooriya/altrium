@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Cycles are not scoped by subject, because a cycle is not about anybody — its dates and
+ * Cycles are not scoped by subject, because a cycle is not about anybody - its dates and
  * status are the same fact for the whole organisation.
  *
  * <p>What must not leak from here is <em>who is in</em> a cycle. That is

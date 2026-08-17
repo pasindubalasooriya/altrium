@@ -33,7 +33,7 @@ public final class OrgDtos {
      * A row in the user console.
      *
      * <p>Carries the manager's name as well as their id so the console need not issue a
-     * lookup per row — the page would otherwise be one query plus one per person, which
+     * lookup per row - the page would otherwise be one query plus one per person, which
      * degrades exactly as the organisation grows.
      */
     public record UserView(

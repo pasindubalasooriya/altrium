@@ -5,12 +5,12 @@ What you need on a machine before the backend will run.
 | Tool | Version here | Notes |
 |---|---|---|
 | JDK | 21 (Corretto 21.0.11) | Java 21 is fixed by the stack |
-| Maven | 3.9.16, via `mvnw` | Use the wrapper — do not install Maven separately |
+| Maven | 3.9.16, via `mvnw` | Use the wrapper - do not install Maven separately |
 | MySQL Server | 8.4 | See below |
 
 ## 1. MySQL Server
 
-MySQL Workbench is **only a GUI client** — installing it does not give you a server. Check whether you actually have one:
+MySQL Workbench is **only a GUI client** - installing it does not give you a server. Check whether you actually have one:
 
 ```powershell
 Get-Service -Name '*mysql*'          # a service, or nothing
@@ -63,7 +63,7 @@ default-character-set = utf8mb4
 .\scripts\start-mysql.ps1
 ```
 
-> **The server is not a Windows service.** Installing one needs administrator rights the dev account does not have, so MySQL runs as a plain user process and **does not survive a reboot**. Run the start script again after restarting. If someone on the team has admin rights and wants a service instead, `mysqld --install` from an elevated prompt is the upgrade path — nothing else changes.
+> **The server is not a Windows service.** Installing one needs administrator rights the dev account does not have, so MySQL runs as a plain user process and **does not survive a reboot**. Run the start script again after restarting. If someone on the team has admin rights and wants a service instead, `mysqld --install` from an elevated prompt is the upgrade path - nothing else changes.
 
 ### Create the schemas and application user
 
@@ -83,7 +83,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '<pick-a-root-password>';
 FLUSH PRIVILEGES;
 ```
 
-Two schemas, deliberately: `altrium` for development and `altrium_test` for the test suite. Tests run against **real MySQL** rather than H2 so that Flyway migrations and the DB-level plan-exclusivity constraint (P-5.7) are genuinely exercised — an in-memory substitute would let both silently pass.
+Two schemas, deliberately: `altrium` for development and `altrium_test` for the test suite. Tests run against **real MySQL** rather than H2 so that Flyway migrations and the DB-level plan-exclusivity constraint (P-5.7) are genuinely exercised - an in-memory substitute would let both silently pass.
 
 ## 2. Environment variables
 
@@ -112,7 +112,8 @@ cd backend
 
 | Symptom | Cause |
 |---|---|
-| `Communications link failure` | MySQL isn't running — `.\scripts\start-mysql.ps1` |
+| `Communications link failure` | MySQL isn't running - `.\scripts\start-mysql.ps1` |
 | `Access denied for user 'altrium'` | `ALTRIUM_DB_PASSWORD` not set, or set in a different shell than the one running Maven |
-| `Schema-validation: missing table` | Migrations not applied to that schema — run `flyway:migrate` against it |
+| `Schema-validation: missing table` | Migrations not applied to that schema - run `flyway:migrate` against it |
 | MySQL won't start after a reboot | Expected; it isn't a service. Run the start script |
+MySQL password AltriumDev!2026

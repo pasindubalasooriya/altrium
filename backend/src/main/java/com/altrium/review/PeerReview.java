@@ -21,8 +21,8 @@ import java.time.Instant;
  * <p><strong>Authorship is stored, in full, under the peer's name.</strong> Anonymity here
  * is a rule about who may read the row, not about what the row contains (P-3.3): the
  * manager and HR-in-scope see exactly who wrote what, and only the subject never does.
- * Storing feedback anonymously would trade away all accountability — nobody could challenge
- * a malicious review, or notice the same person writing every unkind one — to buy a
+ * Storing feedback anonymously would trade away all accountability - nobody could challenge
+ * a malicious review, or notice the same person writing every unkind one - to buy a
  * confidentiality the read layer already provides.
  *
  * <p>Once {@code submittedAt} is set the row is final (P-3.5), backed by the unique
@@ -54,7 +54,7 @@ public class PeerReview {
 
     /**
      * Input to the manager's decision (P-4.2), never an ingredient in a calculation. No
-     * aggregate of this column is stored or derived on read — an average shown beside the
+     * aggregate of this column is stored or derived on read - an average shown beside the
      * manager's choice becomes a suggestion, and then a default (P-4.1).
      */
     @Enumerated(EnumType.STRING)

@@ -1,4 +1,4 @@
-# Altrium — Authorization Policy List
+# Altrium - Authorization Policy List
 
 The enumerated authorization model. This is the intellectual core of the project: it is what makes the confidentiality claim concrete and testable.
 
@@ -25,7 +25,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 |---|---|
 | **P-0.1** | Every authenticated principal is an **Employee** in addition to any other role. Manager, HR, Leadership and Super Admin are additive, never exclusive. |
 | **P-0.2** | Every read and write routes through a single `AuthorizationService`. No controller, repository or service performs its own ad-hoc check. |
-| **P-0.3** | Every **collection** read is scoped inside the SQL `WHERE` clause via a JPA `Specification`. Fetching then filtering in Java is prohibited — it leaks through pagination counts and total-elements headers. |
+| **P-0.3** | Every **collection** read is scoped inside the SQL `WHERE` clause via a JPA `Specification`. Fetching then filtering in Java is prohibited - it leaks through pagination counts and total-elements headers. |
 | **P-0.4** | Every **single-entity** read re-checks the same predicate before returning. An ID guessed or copied from another user's data must 403. |
 | **P-0.5** | All denials return **403**, with no body distinguishing "does not exist" from "not permitted". |
 | **P-0.6** | **Evaluation order is fixed and enforced in one method:** (1) authenticated → (2) absolute self-blocks → (3) role gate → (4) relationship/scope → (5) explicit-grant override → (6) state gates. **Step 5 can never reach past step 2.** Ordering them any other way lets a granted HR Head reach their own review. |
@@ -35,18 +35,18 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 | # | Policy |
 |---|---|
-| **P-1.1** | `isManagerOf(A,S)` is true only when `mgr(S) = A`. **Direct reports only** — never transitive, never skip-level. |
+| **P-1.1** | `isManagerOf(A,S)` is true only when `mgr(S) = A`. **Direct reports only** - never transitive, never skip-level. |
 | **P-1.2** | A manager may read and write review artifacts **only** for S where `isManagerOf(A,S)`. |
-| **P-1.3** | Peer reviewers for S are selected by `mgr(S)` — one uniform rule. Applied to a manager-as-reviewee this is scenario §7's "the manager's manager selects", so no separate mechanism exists. |
+| **P-1.3** | Peer reviewers for S are selected by `mgr(S)` - one uniform rule. Applied to a manager-as-reviewee this is scenario §7's "the manager's manager selects", so no separate mechanism exists. |
 | **P-1.4** | Reporting-line assignment walks up the chain and **rejects any cycle**; every user has at most one manager. Without this the direct-reports query never terminates. |
 | **P-1.5** | Leadership is never a reviewee: no review, rating or plan artifact may be created with a Leadership member as S. Enforced at creation, not merely hidden on read. |
 
-## P-2 HR scoping (ABAC) — the ordering-critical block
+## P-2 HR scoping (ABAC) - the ordering-critical block
 
 | # | Policy |
 |---|---|
 | **P-2.1** | Every HR capability is confined to `grants(A)`. An HR action on a resource whose department ∉ `grants(A)` is 403. |
-| **P-2.2** | **Own-review block — absolute.** An HR user may never read or act on any review, rating or plan where they are S. **No grant, flag or role overrides this.** Evaluated at step 2 of P-0.6, before any override.<br><br>*Resolves a source-document conflict: scenario §3 reads "…including their own reviews, unless explicitly granted", implying the override covers own reviews. §14 states the own-review block is absolute. §14 governs; §3's phrasing is loose.* |
+| **P-2.2** | **Own-review block - absolute.** An HR user may never exercise **HR authority** over any review, rating or plan where they are S: no calibration of their own rating, no co-signing or witnessing of their own PIP, no HR-scoped read of their own record. **No grant, flag or role overrides this.** Evaluated at step 2 of P-0.6, before any override, by withholding `HR_IN_SCOPE` grounds entirely.<br><br>What it does **not** remove is the ordinary right every reviewee holds. An HR user is an employee too (P-0.1), so they read their own final rating and manager feedback on the same terms as anyone (P-4.4), and their own peer feedback stays hidden on the same terms as anyone (P-3.3) - because no subject reads peer feedback, not because they are HR.<br><br>*Resolves two source-document conflicts. First, scenario §3 reads "…including their own reviews, unless explicitly granted", implying the override covers own reviews; §14 states the block is absolute. §14 governs; §3's phrasing is loose. Second, §14's blanket wording read against P-4.4 would withhold an HR user's own rating from them, leaving the HR Head reviewed by Leadership under P-2.6 and never told the outcome. Settled by the team: the block removes HR **authority**, not employee rights.* |
 | **P-2.3** | **Own-department block.** An HR user may not act on resources where `dept(resource) = dept(A)`. |
 | **P-2.4** | **Explicit-grant override (HR Head).** A grant row carrying the explicit-grant flag lifts **P-2.3 only**, for that department. P-2.2 still bites. This is a grant configuration, **not a new role**. |
 | **P-2.5** | Grants are resolved **from the database on every request**, cached only inside that request (request-scoped holder). Never in the JWT, the session, or a login-time cache. A grant change applies on the caller's very next request, with no re-login. |
@@ -57,18 +57,18 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | # | Artifact | Policy |
 |---|---|---|
 | **P-3.1** | Self-review | Written by S only. Readable by S, `mgr(S)`, HR-in-scope. No rating field exists on it at all. |
-| **P-3.2** | Peer review | Readable by `mgr(S)` and HR-in-scope, **including author identity**. Where S is themselves a manager, `mgr(S)` is the manager's manager — the same rule one level up, not a separate mechanism (scenario §7). |
-| **P-3.3** | Peer review — anonymity | **S may never receive peer text, peer rating, peer author, or peer count** — through any endpoint, aggregate, sort order, pagination count or error message. Structural, not conditional: the subject-scoped query never joins the peer table. |
-| **P-3.4** | Peer review — write | Only the two assigned peers may write, only for their assigned S, only while the cycle is open. |
-| **P-3.5** | Peer review — single submission | Once submitted, immutable (scenario §15.2). A second submission is refused with **409**, backed by a unique constraint on `(cycle_id, subject_id, peer_id)`. 409 rather than 403 because the peer *has* permission and it is the state that forbids the write; P-0.5's 403 rule governs **access** denials. |
-| **P-3.6** | Peer assignment | Exactly **two**, chosen by `mgr(S)` from active users; cross-department allowed (§5). **Excluded: S themselves, and `mgr(S)`** — a manager is never a peer reviewer of their own report, since they already write the manager review. Scenario §7's allowance for a manager-reviewee's peers to be same-level managers or their own reports is unaffected. |
+| **P-3.2** | Peer review | Readable by `mgr(S)` and HR-in-scope, **including author identity**. Where S is themselves a manager, `mgr(S)` is the manager's manager - the same rule one level up, not a separate mechanism (scenario §7). |
+| **P-3.3** | Peer review - anonymity | **S may never receive peer text, peer rating, peer author, or peer count** - through any endpoint, aggregate, sort order, pagination count or error message. Structural, not conditional: the subject-scoped query never joins the peer table. |
+| **P-3.4** | Peer review - write | Only the two assigned peers may write, only for their assigned S, only while the cycle is open. |
+| **P-3.5** | Peer review - single submission | Once submitted, immutable (scenario §15.2). A second submission is refused with **409**, backed by a unique constraint on `(cycle_id, subject_id, peer_id)`. 409 rather than 403 because the peer *has* permission and it is the state that forbids the write; P-0.5's 403 rule governs **access** denials. |
+| **P-3.6** | Peer assignment | Exactly **two**, chosen by `mgr(S)` from active users; cross-department allowed (§5). **Excluded: S themselves, and `mgr(S)`** - a manager is never a peer reviewer of their own report, since they already write the manager review. Scenario §7's allowance for a manager-reviewee's peers to be same-level managers or their own reports is unaffected. |
 | **P-3.7** | Manager review | Written by `mgr(S)` only. Readable by S, `mgr(S)`, HR-in-scope. |
 
 ## P-4 Ratings
 
 | # | Policy |
 |---|---|
-| **P-4.1** | Only `mgr(S)` sets the final rating. It is **chosen, never computed** from peer ratings — no aggregate is stored or surfaced as a suggestion (scenario §11). |
+| **P-4.1** | Only `mgr(S)` sets the final rating. It is **chosen, never computed** from peer ratings - no aggregate is stored or surfaced as a suggestion (scenario §11). |
 | **P-4.2** | `mgr(S)` may read peer ratings for their reports, as input to P-4.1. |
 | **P-4.3** | HR-in-scope calibrates the final rating. Every change records before-value, after-value, actor and timestamp as an immutable append-only row. |
 | **P-4.4** | S reads their **final rating and manager feedback only**, and only once released. Nothing else in the cycle is exposed to them. |
@@ -78,11 +78,11 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 | # | Policy |
 |---|---|
-| **P-5.1** | PDP readable by S, `mgr(S)`, HR-in-scope. HR is **read-only** on a PDP — no write, no approve. |
+| **P-5.1** | PDP readable by S, `mgr(S)`, HR-in-scope. HR is **read-only** on a PDP - no write, no approve. |
 | **P-5.2** | Only `mgr(S)` approves PDP or PIP goals as complete. |
-| **P-5.3** | **PIP co-sign gate.** A PIP with `cosigned_at IS NULL` is invisible to S. Enforced as a predicate in the query, so calling the endpoint directly 403s — not a UI condition. |
+| **P-5.3** | **PIP co-sign gate.** A PIP with `cosigned_at IS NULL` is invisible to S. Enforced as a predicate in the query, so calling the endpoint directly 403s - not a UI condition. |
 | **P-5.4** | Only HR-in-scope may co-sign and record the witness. A manager can do neither; that separation is the entire point of the formality objects (scenario §9). |
-| **P-5.5** | PDP goal target dates are movable by `mgr(S)`. **PIP deadlines are immutable once set** — no actor, including HR, may extend them. |
+| **P-5.5** | PDP goal target dates are movable by `mgr(S)`. **PIP deadlines are immutable once set** - no actor, including HR, may extend them. |
 | **P-5.6** | A PIP must carry non-empty consequence-clause text before it can be co-signed. |
 | **P-5.7** | **Exclusivity invariant.** No employee holds an ACTIVE PDP and an ACTIVE PIP simultaneously. Enforced in `PlanService` **and** by a database constraint, so concurrent requests cannot both slip through. |
 | **P-5.8** | Only `PlanService` mutates plan status. No controller or repository writes a status field. |
@@ -93,7 +93,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 |---|---|
 | **P-6.1** | Only the Super Admin writes `quadrimester_config` and `cohort_membership`. |
 | **P-6.2** | The cycle start date may be changed **only while `opened_at IS NULL`**; afterwards refused. |
-| **P-6.3** | HR monitors cycles for their granted departments only — counts and statuses scoped by `grants(A)`, subject to P-2.2 and P-2.3. |
+| **P-6.3** | HR monitors cycles for their granted departments only - counts and statuses scoped by `grants(A)`, subject to P-2.2 and P-2.3. |
 | **P-6.4** | The sweep runs as a **system principal**: it bypasses user authorization (there is no user) but remains bound by every domain invariant. |
 
 ## P-7 Leadership
@@ -104,7 +104,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-7.2** | Leadership are **not reviewees (P-1.5) and hold no PDP and no PIP**.<br><br>*Resolves a source-document conflict: §7 excludes Leadership from review; §8 says every employee holds a PDP. §8 means every reviewable employee.* |
 | **P-7.3** | Leadership act as reviewer and peer-assigner for the tier directly below them, including the HR Head (P-2.6). |
 
-## P-8 Exports — Sprint 2, policy reserved now
+## P-8 Exports - Sprint 2, policy reserved now
 
 | # | Policy |
 |---|---|
@@ -124,7 +124,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 ## Denial test matrix
 
-Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` with a minted JWT — never through the UI. A UI-driven test proves a button is hidden, not that access is refused.
+Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` with a minted JWT - never through the UI. A UI-driven test proves a button is hidden, not that access is refused.
 
 | Test | Policy | Expect |
 |---|---|---|
@@ -132,7 +132,8 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | Manager reads a non-report's plan | P-1.2, P-5.1 | 403 |
 | Subject requests peer reviews about themselves, by every route including list endpoints and pagination counts | P-3.3 | 403 / absent |
 | HR acts in their own department without the explicit grant | P-2.3 | 403 |
-| **HR with an explicit grant reaches their own review** — the rule-ordering test | P-0.6, P-2.2, P-2.4 | 403 |
+| **HR with an explicit grant calibrates their own rating, co-signs their own PIP, or reads their own peer feedback** - the rule-ordering test | P-0.6, P-2.2, P-2.4 | 403 |
+| HR with an explicit grant reads their own released rating and manager feedback | P-2.2, P-4.4 | permitted, on `SELF` grounds |
 | HR grant revoked mid-session, next request with the same token | P-2.5 | 403, no re-login |
 | Subject reads a PIP before co-sign | P-5.3 | 403 |
 | Manager attempts co-sign or witness | P-5.4 | 403 |

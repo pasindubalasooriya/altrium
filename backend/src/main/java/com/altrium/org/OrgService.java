@@ -120,7 +120,7 @@ public class OrgService {
      * Sets or clears a reporting line.
      *
      * <p>{@code managerId} of null detaches the user, which is how the top of the chain is
-     * expressed — Leadership report to nobody.
+     * expressed - Leadership report to nobody.
      */
     public AppUser setManager(Long userId, Long managerId) {
         AppUser user = requireUser(userId);
@@ -162,7 +162,7 @@ public class OrgService {
      *
      * <p>The caller passes the mapper rather than receiving entities, so the conversion runs
      * <em>inside</em> this transaction. Returning entities instead would hand the controller
-     * lazy proxies belonging to a closed session — which fails only outside a transaction,
+     * lazy proxies belonging to a closed session - which fails only outside a transaction,
      * meaning tests that wrap themselves in one would never see it.
      */
     @Transactional(readOnly = true)
@@ -176,7 +176,7 @@ public class OrgService {
         return mapper.apply(requireUser(id));
     }
 
-    /** Direct reports only (P-1.1) — never transitive. */
+    /** Direct reports only (P-1.1) - never transitive. */
     @Transactional(readOnly = true)
     public <T> List<T> directReports(Long managerId, Function<AppUser, T> mapper) {
         return users.findByManagerId(managerId).stream().map(mapper).toList();

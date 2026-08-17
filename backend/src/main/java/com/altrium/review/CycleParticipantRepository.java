@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.Optional;
 
 /**
- * The review list's repository — the one every "which reviews may I see?" query goes
+ * The review list's repository - the one every "which reviews may I see?" query goes
  * through.
  *
  * <p>Note what is <em>not</em> here: no {@code findByCycleId}, no {@code findAll()} wrapper,

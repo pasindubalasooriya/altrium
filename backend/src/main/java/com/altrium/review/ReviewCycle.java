@@ -22,8 +22,8 @@ import java.time.LocalDate;
  * One quadrimester's review round.
  *
  * <p>A configured quadrimester and the cycle it becomes are the same record. Keeping them
- * apart would let "is this cycle open?" be answered from two places, and P-6.2 — the start
- * date is locked once {@code openedAt} is set — needs exactly one.
+ * apart would let "is this cycle open?" be answered from two places, and P-6.2 - the start
+ * date is locked once {@code openedAt} is set - needs exactly one.
  */
 @Entity
 @Table(name = "review_cycle")
@@ -38,7 +38,7 @@ public class ReviewCycle {
 
     /**
      * 1, 2 or 3. Stored as TINYINT, which is the honest width for a value with three legal
-     * states, and mapped explicitly so schema validation agrees — an {@code int} field over
+     * states, and mapped explicitly so schema validation agrees - an {@code int} field over
      * a TINYINT column fails validation, and widening the column to suit the Java type would
      * be letting the mapping dictate the schema.
      */
@@ -57,7 +57,7 @@ public class ReviewCycle {
     private LocalDate endDate;
 
     /**
-     * Stamped by the sweep. Its presence is what makes the sweep idempotent — a second run
+     * Stamped by the sweep. Its presence is what makes the sweep idempotent - a second run
      * selects on {@code opened_at IS NULL} and finds nothing to do (P-6.4).
      */
     @Column(name = "opened_at")

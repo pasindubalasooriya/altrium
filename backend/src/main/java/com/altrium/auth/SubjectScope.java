@@ -15,21 +15,21 @@ import java.util.Set;
  *
  * <p>The three sources of visibility are unioned, matching {@link Grounds}:
  * <ul>
- *   <li>{@code includeSelf} — the caller's own row, where the capability allows it</li>
- *   <li>{@code directReportIds} — the manager's report ids, carried in the {@code WHERE}
+ *   <li>{@code includeSelf} - the caller's own row, where the capability allows it</li>
+ *   <li>{@code directReportIds} - the manager's report ids, carried in the {@code WHERE}
  *       clause exactly as required, never derived from a role name</li>
- *   <li>{@code hrDepartmentIds} — the departments resolved for this request, after the
+ *   <li>{@code hrDepartmentIds} - the departments resolved for this request, after the
  *       own-department block and any explicit-grant override</li>
  * </ul>
  *
  * <p><strong>{@code callerId} is what makes P-2.2 a SQL predicate.</strong> The HR branch
  * always excludes the caller's own row, so an HR user's own review cannot appear in a list
- * they are entitled to read — including in its count. Without that term, an HR Head whose
+ * they are entitled to read - including in its count. Without that term, an HR Head whose
  * explicit grant covers their own department would find themselves in their own monitoring
  * list, which is the same ordering bug P-0.6 exists to prevent, arriving through the back
  * door of a collection endpoint.
  *
- * @param callerId        the caller, always present — it is both a grant term and the P-2.2
+ * @param callerId        the caller, always present - it is both a grant term and the P-2.2
  *                        exclusion term
  * @param includeSelf     whether the caller's own row is visible for this capability
  * @param directReportIds ids of the caller's direct reports (P-1.1); empty for non-managers

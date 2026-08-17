@@ -20,7 +20,7 @@ import java.time.Instant;
  * in their own department (P-2.3); this flag lifts that block for this pairing only.
  *
  * <p>It does <strong>not</strong> lift the own-review block (P-2.2). That rule is absolute,
- * has no override, and is enforced above this table — an HR Head with an explicit grant over
+ * has no override, and is enforced above this table - an HR Head with an explicit grant over
  * their own department still cannot reach their own review. Checking the override before the
  * own-review block is precisely the ordering mistake P-0.6 exists to prevent.
  */

@@ -25,10 +25,10 @@ import java.util.Set;
  * <p>This entity is the backbone of the authorization model. Three of its columns carry
  * nearly all of the weight:
  * <ul>
- *   <li>{@code manager} — the single reporting line. {@code isManagerOf(A,S)} is true only
+ *   <li>{@code manager} - the single reporting line. {@code isManagerOf(A,S)} is true only
  *       when {@code S.manager == A} (P-1.1): direct reports only, never transitive.</li>
- *   <li>{@code department} — the unit of HR scoping (P-2.1, P-2.3).</li>
- *   <li>{@code active} — soft delete (P-0.7). Deactivated users are excluded from peer
+ *   <li>{@code department} - the unit of HR scoping (P-2.1, P-2.3).</li>
+ *   <li>{@code active} - soft delete (P-0.7). Deactivated users are excluded from peer
  *       selection, cohort intake and newly opened cycles, but are never removed, because
  *       deleting them would destroy the history and carry-over pillar.</li>
  * </ul>
@@ -61,7 +61,7 @@ public class AppUser {
 
     /**
      * Null only at the top of the chain. Loop rejection is enforced in the service by
-     * walking up the chain (P-1.4) — the database cannot express it, and without the check
+     * walking up the chain (P-1.4) - the database cannot express it, and without the check
      * the direct-reports query never terminates.
      */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -76,7 +76,7 @@ public class AppUser {
      *
      * <p>Asgardeo remains the system of record for provisioning, but these rows are what the
      * authorization layer actually reads, for two reasons. First, it must reason about
-     * <em>other</em> users' roles — P-1.5 and P-7.2 forbid creating any review or plan
+     * <em>other</em> users' roles - P-1.5 and P-7.2 forbid creating any review or plan
      * artifact for a Leadership member, and the caller's token cannot answer that about
      * someone else. Second, resolving the caller's own roles per request rather than trusting
      * claims minted at login is the same principle P-2.5 imposes on HR grants: a change must
