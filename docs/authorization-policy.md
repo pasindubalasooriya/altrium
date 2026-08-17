@@ -116,6 +116,10 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-7.1** | Leadership receives **aggregate metrics only**. No endpoint returns an individual review, rating or plan row to Leadership. Dashboards are Sprint 2, but the policy holds from day one so no drill-down endpoint is ever built. |
 | **P-7.2** | Leadership are **not reviewees (P-1.5) and hold no PDP and no PIP**.<br><br>*Resolves a source-document conflict: §7 excludes Leadership from review; §8 says every employee holds a PDP. §8 means every reviewable employee.* |
 | **P-7.3** | Leadership act as reviewer and peer-assigner for the tier directly below them, including the HR Head (P-2.6). |
+| **P-7.4** | The metrics response **contains no id, name or handle of any person**, so there is nothing a client could build a drill-down link from. P-7.1 is enforced by the shape of the payload, not by a link somebody remembered not to render. |
+| **P-7.5** | The **rating distribution is organisation-wide and is never broken down by department**. A department with one participant would make its distribution that person's rating, and Leadership hold no grounds to read an individual rating. Completion counts *are* broken down by department, because they say only that a rating exists, not what it is. |
+
+`GET /api/leadership/metrics?cycleId=` implements all of the above. It is unscoped by department, which is the difference from HR monitoring: HR oversee the departments they were granted, Leadership see the organisation, and neither sees a person. Charts remain Sprint 2; the endpoint exists now so P-7.1 is enforced by something real rather than by an enum constant nothing implements.
 
 ## P-8 Exports - Sprint 2, policy reserved now
 
@@ -168,6 +172,8 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | PIP failed before its deadline | P-5.12 | 409 |
 | Leadership requests an individual review | P-7.1 | 403 |
 | Leadership is made a reviewee | P-1.5, P-7.2 | rejected at creation |
+| Manager, HR, Super Admin or employee requests leadership metrics | P-7.1 | 403 |
+| Leadership requests a rating distribution for one department | P-7.5 | not offered; the endpoint returns one organisation-wide distribution |
 | Super Admin requests review content, or cycle monitoring counts | P-9.4 | 403 |
 | HR configures a cycle or a cohort, however wide their grants | P-6.1 | 403 |
 | Manager requests cycle monitoring for a department | P-6.3 | 403 |
