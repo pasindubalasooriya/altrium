@@ -10,6 +10,8 @@ import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
 import com.altrium.org.AppUser;
 import com.altrium.org.AppUserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -200,6 +202,30 @@ public class ReviewWriteService {
         authorization.require(Capability.ASSIGN_PEERS, subject);
 
         return assignments.findByCycleIdAndSubjectId(cycleId, subjectId).stream().map(mapper).toList();
+    }
+
+    /**
+     * Who could be assigned as a peer for this subject (P-3.6).
+     *
+     * <p>Guarded by {@link Capability#ASSIGN_PEERS} - the same capability as the write it feeds,
+     * so the only person who can see the roster through this route is the one person entitled to
+     * choose from it. That matters: peer assignment is cross-department, so the candidate set is
+     * everybody active, and a wider gate here would have handed the whole employee directory to
+     * anybody who asked.
+     *
+     * <p>The exclusions live in the query, not in a filter applied afterwards, so the page count
+     * describes the candidates rather than the organisation.
+     */
+    @Transactional(readOnly = true)
+    public <T> Page<T> peerCandidates(Long subjectId, String name, Pageable pageable,
+                                      Function<AppUser, T> mapper) {
+
+        ReviewSubject subject = authorization.subject(subjectId);
+        authorization.require(Capability.ASSIGN_PEERS, subject);
+
+        String filter = (name == null || name.isBlank()) ? null : name.trim();
+        return users.findPeerCandidates(subjectId, subject.managerId(), filter, pageable)
+                .map(mapper);
     }
 
     /**

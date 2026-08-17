@@ -66,6 +66,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-3.8** | Peer assignment - reassignment | Peers may be replaced while nothing has been written and **not afterwards** (409). Replacing a peer who has already submitted would strand their row: unreadable through any endpoint, and nobody would know it was there. |
 | **P-3.9** | Peer assignment - visibility | Who is assigned to S is readable **only by `mgr(S)`**, gated on `ASSIGN_PEERS` rather than a read capability. S asking about themselves is refused by the ordinary route, since they are not their own manager. A peer sees **their own workload only** - whom they must review, never who reviews them, and never who else was assigned to the same subject. |
 | **P-3.10** | Write window | Every review write requires an **open cycle**, refused with 409. A domain invariant rather than a state gate: it refuses everybody identically, S included, so it says nothing about the caller. |
+| **P-3.11** | Peer assignment - candidates | The **peer-candidate list** is guarded by `ASSIGN_PEERS`, the capability of the write it feeds, not by a read capability and not by the Manager role. It is the only route to the employee roster outside the Super Admin's console, so the gate matters: it opens only to the person entitled to choose, and only for one named subject. It carries a name and a department and nothing else. Its exclusions - the subject, `mgr(S)`, deactivated users - live in the query, so the list offered and the set the write accepts are the same set, and the page count describes the candidates rather than the organisation. |
 
 ## P-4 Ratings
 
@@ -185,6 +186,8 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | Manager is assigned as their own report's peer | P-3.6 | rejected at assignment |
 | Unassigned colleague submits peer feedback | P-3.4 | 403 |
 | Subject asks who was assigned to review them | P-3.3, P-3.9 | 403 |
+| Subject, or a manager who is not `mgr(S)`, lists peer candidates for S | P-3.11 | 403 |
+| Super Admin lists peer candidates | P-3.11, P-9.4 | 403 |
 | Manager assigns peers for somebody who is not their report | P-1.2, P-3.6 | 403 |
 | HR writes a manager review, however wide their grants | P-3.7 | 403 |
 | Peers reassigned after feedback has been submitted | P-3.8 | 409 |

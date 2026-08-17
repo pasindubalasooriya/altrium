@@ -9,9 +9,9 @@ The nine phases of the Sprint 1 frontend, with what each one covers and why the 
 | 0 | Backend prerequisites: CORS, the leadership metrics endpoint | done, 195 backend tests |
 | 1 | Scaffold, Asgardeo login, `/me`, the shell | done |
 | 2 | Shared foundations: fetch wrapper, error model, pager, forms | done, 10 frontend tests |
-| 3 | Employee console, `/my/*` | next |
-| 4 | Manager console, `/manager/*` | |
-| 5 | HR console, `/hr/*` | |
+| 3 | Employee console, `/my/*` | done |
+| 4 | Manager console, `/manager/*` | done, 202 backend + 17 frontend tests |
+| 5 | HR console, `/hr/*` | next |
 | 6 | Leadership, `/leadership/metrics` | |
 | 7 | Super Admin console, `/admin/*` | |
 | 8 | Verification: Vitest and the manual walkthrough | |
@@ -104,6 +104,8 @@ Self-review is a `PUT` with no subject id, so the form has no employee selector 
 The team list is the **same endpoint** the employee console calls. It returns different rows because the scope is in the `WHERE` clause, not because the client asked differently - the clearest demonstration of the project's central claim, and worth a comment in the code.
 
 **Peer assignment** requires exactly two; the backend rejects the subject, `mgr(S)` and deactivated users. The picker surfaces the server's 400 rather than silently pre-filtering: the rule is the server's, and a client filter that drifted would hide a real failure.
+
+> **Gap found while building this.** A manager had no way to *see* two people to choose: the only endpoint listing users is the Super Admin's. `GET /api/reviews/{subjectId}/peer-candidates` was added, guarded by `ASSIGN_PEERS` rather than a read capability, so the roster opens only to the person assigning and only for one named subject. Recorded as P-3.11, with seven denial tests.
 
 **No aggregate or suggested rating is displayed.** P-4.1 says the rating is chosen, never computed, and a "peer average" hint would make that false in practice while remaining true in the database.
 

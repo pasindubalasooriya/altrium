@@ -1,5 +1,6 @@
 package com.altrium.web.review;
 
+import com.altrium.org.AppUser;
 import com.altrium.review.ManagerReview;
 import com.altrium.review.PeerAssignment;
 import com.altrium.review.PeerReview;
@@ -9,6 +10,9 @@ import com.altrium.review.SelfReview;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -94,6 +98,23 @@ public class ReviewWriteController {
     public record PeerTaskView(Long subjectId, String subjectName, Long cycleId, boolean submitted) {
     }
 
+    /**
+     * A person the manager could pick as a peer.
+     *
+     * <p>Name and department only. This is a directory the manager can page through, so it
+     * carries the minimum needed to tell two colleagues apart and nothing more - no email, no
+     * reporting line, and nothing whatever about anybody's review.
+     */
+    public record PeerCandidateView(Long id, String fullName, String departmentName) {
+
+        static PeerCandidateView of(AppUser user) {
+            return new PeerCandidateView(
+                    user.getId(),
+                    user.getFullName(),
+                    user.getDepartment() == null ? null : user.getDepartment().getName());
+        }
+    }
+
     public record PeerReviewWritten(Long subjectId, Rating rating, Instant submittedAt) {
 
         static PeerReviewWritten of(PeerReview review) {
@@ -156,6 +177,26 @@ public class ReviewWriteController {
     public List<PeerAssignmentView> listPeers(@PathVariable Long subjectId,
                                               @RequestParam Long cycleId) {
         return reviews.listAssignedPeers(cycleId, subjectId, PeerAssignmentView::of);
+    }
+
+    /**
+     * Who could be assigned as a peer for this subject.
+     *
+     * <p>Added for the manager console, which otherwise had no way to choose two people: the
+     * only endpoint that lists users is the Super Admin's. It is guarded by
+     * {@code ASSIGN_PEERS}, the same capability as the write, so the roster is reachable only
+     * by the one person entitled to pick from it and only in the act of picking.
+     *
+     * <p>Paged and searchable rather than a full list, because peer assignment is
+     * cross-department and the candidate set is therefore everybody active.
+     */
+    @GetMapping("/{subjectId}/peer-candidates")
+    @Operation(summary = "People assignable as peers for this subject; the assigner's alone")
+    public Page<PeerCandidateView> peerCandidates(
+            @PathVariable Long subjectId,
+            @RequestParam(required = false) String name,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return reviews.peerCandidates(subjectId, name, pageable, PeerCandidateView::of);
     }
 
     /** Whom the caller must review. The safe direction of the assignment table. */

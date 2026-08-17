@@ -155,3 +155,119 @@ export interface OwnRating {
   managerFeedback: string | null
   released: boolean
 }
+
+// ---------------------------------------------------------------- writing reviews
+
+export interface SelfReviewWritten {
+  cycleId: number
+  achievements: string | null
+  challenges: string | null
+  goals: string | null
+  submittedAt: string | null
+  submitted: boolean
+}
+
+export interface ManagerReviewWritten {
+  subjectId: number
+  feedback: string | null
+  submittedAt: string | null
+  submitted: boolean
+}
+
+/**
+ * A peer's own workload.
+ *
+ * Note what is not here: who the *other* peer is. A peer knowing that would be one
+ * conversation away from the subject knowing it too, so the server does not send it.
+ */
+export interface PeerTask {
+  subjectId: number
+  subjectName: string
+  cycleId: number
+  submitted: boolean
+}
+
+/** The manager's view of an assignment. It names the peer, because they chose them. */
+export interface PeerAssignment {
+  subjectId: number
+  subjectName: string
+  peerId: number
+  peerName: string
+}
+
+export interface PeerCandidate {
+  id: number
+  fullName: string
+  departmentName: string | null
+}
+
+export interface RatingView {
+  subjectId: number
+  rating: Rating
+  setAt: string
+  releasedAt: string | null
+  released: boolean
+}
+
+export interface Calibration {
+  from: Rating
+  to: Rating
+  by: string
+  at: string
+  note: string | null
+}
+
+// ---------------------------------------------------------------- plans
+
+export type GoalStatus = 'OPEN' | 'COMPLETE'
+
+export interface Goal {
+  id: number
+  title: string
+  detail: string | null
+  targetDate: string | null
+  status: GoalStatus
+  completedAt: string | null
+  approvedBy: string | null
+}
+
+export type PlanStatus = 'ACTIVE' | 'SUSPENDED'
+
+export interface DevelopmentPlan {
+  userId: number
+  userName: string
+  status: PlanStatus
+  active: boolean
+  suspendedAt: string | null
+  goals: Goal[]
+}
+
+export type ImprovementStatus = 'ACTIVE' | 'PASSED' | 'FAILED'
+
+export interface ImprovementPlan {
+  id: number
+  userId: number
+  userName: string
+  status: ImprovementStatus
+  active: boolean
+  openedBy: string
+  openedAt: string
+  deadline: string
+  consequenceClause: string | null
+  cosignedBy: string | null
+  cosignedAt: string | null
+  cosigned: boolean
+  witnessName: string | null
+  witnessRecordedAt: string | null
+  closedAt: string | null
+  goals: Goal[]
+}
+
+/**
+ * `hasPlan` is false both when no plan exists and when one exists but is not co-signed.
+ * The two are deliberately indistinguishable, and the screen renders them the same way.
+ */
+export interface OwnImprovementPlan {
+  hasPlan: boolean
+  plan: ImprovementPlan | null
+}

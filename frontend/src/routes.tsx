@@ -2,6 +2,15 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { EmptyState, Loading } from './components/States'
+import { MyReviews } from './features/my/MyReviews'
+import { SelfReview } from './features/my/SelfReview'
+import { PeerTasks } from './features/my/PeerTasks'
+import { MyRating } from './features/my/MyRating'
+import { MyPlan } from './features/my/MyPlan'
+import { MyImprovementPlan } from './features/my/MyImprovementPlan'
+import { Team } from './features/manager/Team'
+import { ReviewDetail } from './features/manager/ReviewDetail'
+import { MemberPlan } from './features/manager/MemberPlan'
 
 /**
  * The route table.
@@ -21,22 +30,16 @@ export function AppRoutes() {
       <Route element={<Shell />}>
         <Route index element={<Landing />} />
 
-        <Route path="my/reviews" element={<ToBuild phase="3" name="My reviews" />} />
-        <Route path="my/self-review" element={<ToBuild phase="3" name="Self review" />} />
-        <Route path="my/peer-tasks" element={<ToBuild phase="3" name="Peer reviews" />} />
-        <Route path="my/rating" element={<ToBuild phase="3" name="My rating" />} />
-        <Route path="my/plan" element={<ToBuild phase="3" name="My development plan" />} />
-        <Route
-          path="my/improvement-plan"
-          element={<ToBuild phase="3" name="My improvement plan" />}
-        />
+        <Route path="my/reviews" element={<MyReviews />} />
+        <Route path="my/self-review" element={<SelfReview />} />
+        <Route path="my/peer-tasks" element={<PeerTasks />} />
+        <Route path="my/rating" element={<MyRating />} />
+        <Route path="my/plan" element={<MyPlan />} />
+        <Route path="my/improvement-plan" element={<MyImprovementPlan />} />
 
-        <Route path="manager/team" element={<ToBuild phase="4" name="My team" />} />
-        <Route
-          path="manager/reviews/:subjectId"
-          element={<ToBuild phase="4" name="Team member review" />}
-        />
-        <Route path="manager/plans/:userId" element={<ToBuild phase="4" name="Team member plan" />} />
+        <Route path="manager/team" element={<Team />} />
+        <Route path="manager/reviews/:subjectId" element={<ReviewDetail />} />
+        <Route path="manager/plans/:userId" element={<MemberPlan />} />
 
         <Route path="hr/scope" element={<ToBuild phase="5" name="My HR scope" />} />
         <Route path="hr/cycles" element={<ToBuild phase="5" name="Cycle monitoring" />} />

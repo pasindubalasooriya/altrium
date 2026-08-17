@@ -46,9 +46,11 @@ function Header({ fullName, roles }: { fullName: string; roles: Role[] }) {
         <span className="font-semibold tracking-tight">Altrium</span>
 
         <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link to="/my/reviews">My reviews</Link>
-          <Link to="/my/plan">My plan</Link>
+          <Link to="/my/reviews">My review</Link>
+          <Link to="/my/self-review">Self-review</Link>
           <Link to="/my/peer-tasks">Peer reviews</Link>
+          <Link to="/my/rating">My rating</Link>
+          <Link to="/my/plan">My plan</Link>
           {hasRole(roles, 'MANAGER') && <Link to="/manager/team">My team</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/cycles">Cycles</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/scope">My HR scope</Link>}

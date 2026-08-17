@@ -89,4 +89,33 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
     List<AppUser> findByManagerId(Long managerId);
 
     long countByManagerId(Long managerId);
+
+    /**
+     * People who could be assigned as a peer reviewer for one subject (P-3.6).
+     *
+     * <p>Every exclusion the write path enforces is carried here in the {@code WHERE} clause,
+     * so the list a manager is shown and the set the write will accept are the same set. A
+     * candidate list assembled from a different rule would offer somebody the write then
+     * refuses, which reads as a bug in the system rather than as the rule it is.
+     *
+     * <p>Excluded: the subject themselves, the subject's manager - who already writes the
+     * manager review - and anybody deactivated (P-0.7).
+     *
+     * <p>Paged, and never a full roster in one response: nothing may be hardcoded to the size
+     * of the organisation. Cross-department is permitted, so the candidate set is genuinely
+     * everybody, which is precisely why it has to be paged and searchable rather than listed.
+     */
+    @Query("""
+            SELECT u FROM AppUser u
+            LEFT JOIN FETCH u.department
+            WHERE u.active = true
+              AND u.id <> :subjectId
+              AND (:managerId IS NULL OR u.id <> :managerId)
+              AND (:name IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :name, '%')))
+            ORDER BY u.fullName
+            """)
+    Page<AppUser> findPeerCandidates(@Param("subjectId") Long subjectId,
+                                     @Param("managerId") Long managerId,
+                                     @Param("name") String name,
+                                     Pageable pageable);
 }
