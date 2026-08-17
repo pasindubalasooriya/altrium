@@ -53,7 +53,9 @@ function Header({ fullName, roles }: { fullName: string; roles: Role[] }) {
           <Link to="/my/plan">My plan</Link>
           {hasRole(roles, 'MANAGER') && <Link to="/manager/team">My team</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/cycles">Cycles</Link>}
-          {hasRole(roles, 'HR') && <Link to="/hr/scope">My HR scope</Link>}
+          {hasRole(roles, 'HR') && <Link to="/hr/reviews">HR reviews</Link>}
+          {hasRole(roles, 'HR') && <Link to="/hr/improvement-plans">Improvement plans</Link>}
+          {hasRole(roles, 'HR') && <Link to="/hr/scope">My scope</Link>}
           {hasRole(roles, 'LEADERSHIP') && <Link to="/leadership/metrics">Metrics</Link>}
           {hasRole(roles, 'SUPER_ADMIN') && <Link to="/admin/users">Administration</Link>}
         </nav>

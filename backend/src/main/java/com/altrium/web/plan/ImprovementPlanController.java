@@ -215,6 +215,21 @@ public class ImprovementPlanController {
                 .orElseGet(() -> new OwnImprovementPlanView(false, null));
     }
 
+    /**
+     * The running plans an HR user oversees - their queue.
+     *
+     * <p>Mapped before {@code /{userId}/active} in this file only for readability; the paths do
+     * not collide. Its scope is the {@code COSIGN_IMPROVEMENT_PLAN} capability's, so a manager
+     * calling it gets an empty list rather than a denial: they have no HR scope, which is not
+     * the same as being refused, and it is the same shape the scoped review list takes for
+     * somebody who may see nothing.
+     */
+    @GetMapping
+    @Operation(summary = "Running improvement plans in your HR scope, including ones awaiting co-signature")
+    public List<ImprovementPlanView> inScope() {
+        return plans.improvementPlansInScope(ImprovementPlanView::of);
+    }
+
     @GetMapping("/{userId}/active")
     @Operation(summary = "Someone's active improvement plan, for their manager or HR-in-scope")
     public ImprovementPlanView active(@PathVariable Long userId) {

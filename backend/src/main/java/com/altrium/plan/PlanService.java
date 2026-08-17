@@ -6,6 +6,7 @@ import com.altrium.auth.AuthorizationService;
 import com.altrium.auth.Capability;
 import com.altrium.auth.CurrentUserService;
 import com.altrium.auth.ReviewSubject;
+import com.altrium.auth.SubjectScope;
 import com.altrium.config.ConflictApiException;
 import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
@@ -482,6 +483,41 @@ public class PlanService {
                 // A closed plan the employee never saw stays unseen: the gate is about whether
                 // this plan was ever put to them, not about whether it is still running.
                 .filter(ImprovementPlan::isCosigned)
+                .map(mapper)
+                .toList();
+    }
+
+    /**
+     * The running improvement plans an HR user oversees.
+     *
+     * <p>Added because HR had no way to <em>find</em> a plan awaiting their co-signature. Every
+     * other route to one starts from a person, and the review list only names people under
+     * review in a cycle - while an improvement plan is opened whenever a manager decides to,
+     * cycle or no cycle. So the person HR must act on was, in practice, undiscoverable.
+     *
+     * <p>The scope comes from {@link Capability#COSIGN_IMPROVEMENT_PLAN}, whose only ground is
+     * {@code HR_IN_SCOPE}. That is not a shortcut: it means the list is exactly "the plans you
+     * could act on", derived from the capability table rather than from a rule written here. A
+     * manager gets no reports and no self, so the same call yields them nothing - they reach
+     * their own reports' plans through the person, as they already did.
+     *
+     * <p>Unlike the per-person read, this is <strong>not</strong> gated on co-signature. An
+     * uncosigned plan is invisible to its subject (P-5.3); it must be visible to HR, because
+     * co-signing it is their job and a plan they cannot see is one they cannot review.
+     */
+    @Transactional(readOnly = true)
+    public <T> List<T> improvementPlansInScope(Function<ImprovementPlan, T> mapper) {
+        SubjectScope scope = authorization.subjectScopeFor(Capability.COSIGN_IMPROVEMENT_PLAN);
+
+        if (scope.hrDepartmentIds().isEmpty()) {
+            // No query at all. An IN clause over an empty set is a SQL error in some dialects
+            // and a full scan in others, and neither is a good way to express "nothing".
+            return List.of();
+        }
+
+        return improvementPlans
+                .findInDepartments(ImprovementStatus.ACTIVE, scope.hrDepartmentIds(), scope.callerId())
+                .stream()
                 .map(mapper)
                 .toList();
     }

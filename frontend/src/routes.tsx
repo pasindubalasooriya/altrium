@@ -11,6 +11,11 @@ import { MyImprovementPlan } from './features/my/MyImprovementPlan'
 import { Team } from './features/manager/Team'
 import { ReviewDetail } from './features/manager/ReviewDetail'
 import { MemberPlan } from './features/manager/MemberPlan'
+import { HrScope } from './features/hr/HrScope'
+import { CycleMonitoring } from './features/hr/CycleMonitoring'
+import { HrReviews } from './features/hr/HrReviews'
+import { Calibration } from './features/hr/Calibration'
+import { ImprovementPlans } from './features/hr/ImprovementPlans'
 
 /**
  * The route table.
@@ -41,14 +46,11 @@ export function AppRoutes() {
         <Route path="manager/reviews/:subjectId" element={<ReviewDetail />} />
         <Route path="manager/plans/:userId" element={<MemberPlan />} />
 
-        <Route path="hr/scope" element={<ToBuild phase="5" name="My HR scope" />} />
-        <Route path="hr/cycles" element={<ToBuild phase="5" name="Cycle monitoring" />} />
-        <Route path="hr/reviews" element={<ToBuild phase="5" name="Reviews in my scope" />} />
-        <Route path="hr/reviews/:subjectId" element={<ToBuild phase="5" name="Calibration" />} />
-        <Route
-          path="hr/improvement-plans"
-          element={<ToBuild phase="5" name="Improvement plans" />}
-        />
+        <Route path="hr/scope" element={<HrScope />} />
+        <Route path="hr/cycles" element={<CycleMonitoring />} />
+        <Route path="hr/reviews" element={<HrReviews />} />
+        <Route path="hr/reviews/:subjectId" element={<Calibration />} />
+        <Route path="hr/improvement-plans" element={<ImprovementPlans />} />
 
         <Route path="leadership/metrics" element={<ToBuild phase="6" name="Metrics" />} />
 

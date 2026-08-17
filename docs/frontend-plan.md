@@ -11,8 +11,8 @@ The nine phases of the Sprint 1 frontend, with what each one covers and why the 
 | 2 | Shared foundations: fetch wrapper, error model, pager, forms | done, 10 frontend tests |
 | 3 | Employee console, `/my/*` | done |
 | 4 | Manager console, `/manager/*` | done, 202 backend + 17 frontend tests |
-| 5 | HR console, `/hr/*` | next |
-| 6 | Leadership, `/leadership/metrics` | |
+| 5 | HR console, `/hr/*` | done, 208 backend + 17 frontend tests |
+| 6 | Leadership, `/leadership/metrics` | next |
 | 7 | Super Admin console, `/admin/*` | |
 | 8 | Verification: Vitest and the manual walkthrough | |
 
@@ -128,6 +128,8 @@ The team list is the **same endpoint** the employee console calls. It returns di
 **The caller's own row is absent from the counts and the review list**, because the backend excludes it. The UI must not add a "you" row back from `/api/me` for completeness.
 
 **Co-sign states plainly that it is the moment the plan becomes visible to the employee.** That is the one place a UI sentence carries real weight: it is an irreversible disclosure, and the person clicking should know it.
+
+> **Second gap found while building.** HR had no way to *find* a plan awaiting co-signature. Every route to one started from a person, and the review list only names people under review in a cycle - while a PIP is opened whenever a manager decides to, cycle or no cycle. `GET /api/plans/improvement` now returns the running plans in HR's granted departments, taking its scope from `COSIGN_IMPROVEMENT_PLAN`. Recorded as P-5.15, with six tests.
 
 ## Phase 6 - leadership (`/leadership/metrics`)
 

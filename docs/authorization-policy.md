@@ -97,6 +97,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-5.12** | A plan that was never co-signed **cannot be passed or failed** (409): the employee never saw it, so no outcome may be recorded against it. A plan can only be **failed once its deadline has passed** - the literal reading of "deadlines missed", and the protection the fixed deadline exists to give. |
 | **P-5.13** | The consequence clause is fixed once co-signed (409). It is what the employee accepted; changing it afterwards would make the signature meaningless. |
 | **P-5.14** | **Failing also resumes the development plan.**<br><br>*A judgment call, not a rule from the documents: §5 step 9 only says a passed plan resumes it. Leaving it suspended would leave the employee holding no active plan at all, contradicting §8's universal development plan. A failed PIP records an outcome; it does not end somebody's development.* |
+| **P-5.15** | The **improvement-plan queue** - running plans in an HR user's granted departments - takes its scope from `COSIGN_IMPROVEMENT_PLAN`, whose only ground is `HR_IN_SCOPE`. A manager therefore receives an empty list rather than a denial, which is the same shape the scoped review list takes for somebody who may see nothing. Unlike the per-person read it is **not** gated on co-signature: an uncosigned plan is invisible to its subject (P-5.3) and must be visible to HR, because co-signing it is their job and a plan they cannot see is one they cannot review. The caller's own row is excluded (P-2.2). |
 | **P-5.8** | Only `PlanService` mutates plan status. No controller or repository writes a status field. |
 
 ## P-6 Cycles and configuration
@@ -167,6 +168,8 @@ Every row is a named JUnit test calling the endpoint **directly** via `MockMvc` 
 | HR or another manager opens a PIP | P-1.2, P-5.7 | 403 |
 | PIP co-signed with no consequence clause | P-5.6 | 400 |
 | Consequence clause edited after co-signing | P-5.13 | 409 |
+| HR user's own improvement plan appears in their own queue | P-2.2, P-5.15 | excluded from the list |
+| Manager or Super Admin requests the improvement-plan queue | P-5.15 | empty list, not a denial |
 | Second PIP opened for the same employee, including concurrently | P-5.7 | 409, one row |
 | Goal added to a suspended PDP | P-5.7 | 409 |
 | PIP passed with goals outstanding, or closed before co-signing | P-5.12 | 409 |
