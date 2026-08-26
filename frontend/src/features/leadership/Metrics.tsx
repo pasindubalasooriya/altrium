@@ -77,10 +77,27 @@ export function Metrics() {
   )
 }
 
+/**
+ * One hue, light to dark, on the brand amber.
+ *
+ * The three ratings are an **ordinal** scale, so they get a sequential ramp rather than three
+ * unrelated hues: darker means a higher rating, and the bars read in order even to somebody who
+ * cannot separate the hues at all.
+ *
+ * The obvious alternative, red-amber-green, was measured and rejected: red against green comes
+ * out at deutan delta-E 5.5, which is below the floor - the two ends of the scale would be the
+ * pair a red-green colourblind reader could least tell apart, which is the worst possible place
+ * to put the confusion. These three steps pass the lightness, step-gap, single-hue and
+ * surface-contrast checks.
+ *
+ * It also keeps the chart from editorialising. A red "Needs Improvement" bar states a judgement
+ * the distribution does not make; Leadership are reading how a population is spread, not being
+ * told which end is the bad one.
+ */
 const RATING_COLOURS: Record<string, string> = {
-  NEEDS_IMPROVEMENT: 'oklch(0.62 0.15 40)',
-  MEETS_EXPECTATIONS: 'oklch(0.58 0.10 255)',
-  EXCEEDS_EXPECTATIONS: 'oklch(0.55 0.13 155)',
+  NEEDS_IMPROVEMENT: '#DCA23C',
+  MEETS_EXPECTATIONS: '#A96F14',
+  EXCEEDS_EXPECTATIONS: '#6B4708',
 }
 
 function Distribution({ distribution }: { distribution: Record<string, number> }) {
@@ -102,12 +119,12 @@ function Distribution({ distribution }: { distribution: Record<string, number> }
         <>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bars} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.005 260)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="oklch(0.55 0.015 260)" />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="oklch(0.55 0.015 260)" />
+              <BarChart data={bars} barCategoryGap="28%" margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.008 80)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
                 <Tooltip
-                  cursor={{ fill: 'oklch(0.95 0.005 260)' }}
+                  cursor={{ fill: 'oklch(0.95 0.006 80)' }}
                   formatter={(value) => [`${Number(value)} people`, 'Rated'] as [string, string]}
                 />
                 <Bar dataKey="total" radius={[4, 4, 0, 0]}>

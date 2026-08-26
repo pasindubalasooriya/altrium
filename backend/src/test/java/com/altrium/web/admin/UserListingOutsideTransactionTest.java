@@ -74,7 +74,9 @@ class UserListingOutsideTransactionTest {
 
         AppUser admin = org.createUser(
                 OrgFixture.subjectOf("lazy-admin"), "lazy-admin@altrium.test", "Lazy Admin",
-                departmentId, null, EnumSet.of(Role.SUPER_ADMIN, Role.MANAGER));
+                // SUPER_ADMIN alone: P-9.5 refuses it alongside a reviewing role, and this test
+                // only ever needed the console access.
+                departmentId, null, EnumSet.of(Role.SUPER_ADMIN));
         adminId = admin.getId();
         createdUsers.add(adminId);
 
@@ -91,9 +93,20 @@ class UserListingOutsideTransactionTest {
     void tearDown() {
         // Nothing rolls back here. Delete reports before managers, or the self-referencing
         // foreign key rejects the delete.
-        users.findById(reportId).ifPresent(users::delete);
-        users.findById(adminId).ifPresent(users::delete);
-        departments.findById(departmentId).ifPresent(departments::delete);
+        //
+        // Null-guarded because a setUp that fails part way through still runs this, and an
+        // exception here would leave whatever it had already created behind - which is exactly
+        // how a stray department once outlived the run and broke an unrelated seed assertion
+        // several classes later.
+        if (reportId != null) {
+            users.findById(reportId).ifPresent(users::delete);
+        }
+        if (adminId != null) {
+            users.findById(adminId).ifPresent(users::delete);
+        }
+        if (departmentId != null) {
+            departments.findById(departmentId).ifPresent(departments::delete);
+        }
         createdUsers.clear();
     }
 

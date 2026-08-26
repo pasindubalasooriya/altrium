@@ -116,15 +116,30 @@ class SeedDataTest {
     }
 
     @Test
-    @DisplayName("P-9.4: the Super Admin is an ordinary employee in the hierarchy")
-    void P_9_4_superAdminIsAnOrdinaryEmployee() {
-        // Platform administration is a role, not a rank. Devin has a manager and a
-        // department like anyone else, and administering the system grants no review access.
+    @DisplayName("P-9.5: the Super Admin is a dedicated account, outside the hierarchy")
+    void P_9_5_superAdminIsADedicatedAccount() {
+        // A Product Owner ruling, replacing the earlier seeding in which Devin was an ordinary
+        // engineer who also administered. No department and no manager, because both exist to
+        // place a reviewee - a department is the unit of HR scoping, a manager is who reviews
+        // you - and this account is never reviewed.
         AppUser devin = users.findByEmail("devin@altrium.test").orElseThrow();
 
-        assertThat(devin.getRoles()).contains(Role.SUPER_ADMIN, Role.EMPLOYEE);
-        assertThat(devin.getManager()).isNotNull();
-        assertThat(devin.getDepartment()).isNotNull();
+        assertThat(devin.getRoles()).containsExactlyInAnyOrder(Role.SUPER_ADMIN, Role.EMPLOYEE);
+        assertThat(devin.getManager()).isNull();
+        assertThat(devin.getDepartment()).isNull();
+    }
+
+    @Test
+    @DisplayName("P-9.5: Employee survives on it, because that marker is what admits any caller")
+    void P_9_5_theEmployeeMarkerSurvives() {
+        // Employee is not a job in this schema. SecurityConfig requires the authority on every
+        // authenticated endpoint, so an account without it could not reach the administration
+        // console it exists to use. What P-9.5 removes is being a reviewee, enforced at step 2
+        // of the evaluation order rather than by taking this marker away.
+        AppUser devin = users.findByEmail("devin@altrium.test").orElseThrow();
+
+        assertThat(devin.getRoles()).contains(Role.EMPLOYEE);
+        assertThat(devin.getRoles()).doesNotContain(Role.MANAGER, Role.HR, Role.LEADERSHIP);
     }
 
     @Test

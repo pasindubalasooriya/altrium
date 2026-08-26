@@ -23,7 +23,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 
 | # | Policy |
 |---|---|
-| **P-0.1** | Every authenticated principal is an **Employee** in addition to any other role. Manager, HR, Leadership and Super Admin are additive, never exclusive. |
+| **P-0.1** | Every authenticated principal is an **Employee** in addition to any other role. Manager, HR and Leadership are additive, never exclusive. **Super Admin is the one exception (P-9.5)**: it is held alone, and holds Employee only as the provisioned-and-active marker every endpoint requires, never as a claim to be reviewed. |
 | **P-0.2** | Every read and write routes through a single `AuthorizationService`. No controller, repository or service performs its own ad-hoc check. |
 | **P-0.3** | Every **collection** read is scoped inside the SQL `WHERE` clause via a JPA `Specification`. Fetching then filtering in Java is prohibited - it leaks through pagination counts and total-elements headers. |
 | **P-0.4** | Every **single-entity** read re-checks the same predicate before returning. An ID guessed or copied from another user's data must 403. |
@@ -138,6 +138,7 @@ Derived from scenario §14. Where scenario §3 and §14 conflict, §14 governs (
 | **P-9.2** | Manages HR department grants, including the explicit-grant flag. |
 | **P-9.3** | Manages cycle configuration and cohort membership. They decide who is reviewed and when, and can read none of the result (P-9.4) - including the monitoring counts, which are HR's. |
 | **P-9.4** | **No read access to any review, rating or plan content.**<br><br>*Not addressed in the source documents; settled by the team. Since the Super Admin grants HR their departments, review access on top would make the role omnipotent and defeat segregation of duties.* |
+| **P-9.5** | **A dedicated account, and never a reviewee.** SUPER_ADMIN is held alone: MANAGER, HR and LEADERSHIP are refused alongside it (400). The account holds no self-review, rating or plan, and cannot be enrolled in a cohort or assigned as anyone's peer. Enforced at **step 2** of P-0.6, alongside the Leadership exclusion, so a participant row arriving by any other route still yields nothing readable.<br><br>EMPLOYEE **is** retained, and that is not a loophole. Employee is not a job in this schema; it is the marker that a caller is provisioned and active, required by `SecurityConfig` on every authenticated endpoint. An account without it could not reach the administration console it exists to use. P-9.5 removes being a *reviewee*, not the marker.<br><br>*Product Owner ruling, and a **deviation from P-0.1**, which states that roles are additive and never exclusive. The reasoning is the same as P-9.4's: this account grants the HR users their departments and configures the cycles, so a reviewing role on top would let one account arrange the scope and then act inside it. It reverses the earlier seeding, in which Devin Marsh was an ordinary engineer who also administered - a deliberate demonstration of P-9.4 that no longer holds.* |
 
 ---
 

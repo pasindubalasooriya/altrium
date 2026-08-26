@@ -124,7 +124,12 @@ export function Users() {
               </thead>
               <tbody>
                 {users.content.map((user) => (
-                  <UserRow key={user.id} user={user} onEdit={() => setEditing(user)} />
+                  <UserRow
+                    key={user.id}
+                    user={user}
+                    editing={editing?.id === user.id}
+                    onEdit={() => setEditing(editing?.id === user.id ? null : user)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -141,14 +146,30 @@ export function Users() {
   )
 }
 
-function UserRow({ user, onEdit }: { user: AdminUser; onEdit: () => void }) {
+function UserRow({
+  user,
+  editing,
+  onEdit,
+}: {
+  user: AdminUser
+  editing: boolean
+  onEdit: () => void
+}) {
   const actions = useUserActions()
   const [confirming, setConfirming] = useState(false)
   const result = actions.deactivate.data
 
   return (
     <>
-      <tr className="border-b border-line/60 last:border-0">
+      {/*
+        The row being edited is marked, because the edit panel sits above the table and at a
+        hundred people it is otherwise possible to scroll it out of view and lose track of whose
+        details are open in it.
+      */}
+      <tr
+        className={`border-b border-line/60 last:border-0 ${editing ? 'bg-brand/10' : ''}`}
+        aria-selected={editing || undefined}
+      >
         <td className="p-3">
           {user.fullName}
           {!user.active && <span className="ml-2 text-xs text-warn">deactivated</span>}
@@ -158,17 +179,27 @@ function UserRow({ user, onEdit }: { user: AdminUser; onEdit: () => void }) {
         <td className="p-3 text-muted">{user.managerName ?? 'nobody'}</td>
         <td className="p-3 text-xs text-muted">{user.roles.join(', ')}</td>
         <td className="p-3 text-right">
-          <Button onClick={onEdit}>Edit</Button>
+          <Button variant={editing ? 'primary' : 'plain'} onClick={onEdit}>
+            {editing ? 'Editing' : 'Edit'}
+          </Button>
           {user.active ? (
             <span className="ml-2 inline-block">
-              <Button variant="danger" onClick={() => setConfirming(true)}>
+              <Button
+                variant="danger"
+                // Confirming is the pending state here. The click opens the explanation row
+                // below rather than writing anything, so the button reflects that it is now
+                // waiting on the person, not on the server.
+                disabled={confirming}
+                onClick={() => setConfirming(true)}
+              >
                 Deactivate
               </Button>
             </span>
           ) : (
             <span className="ml-2 inline-block">
               <Button
-                disabled={actions.reactivate.isPending}
+                busy={actions.reactivate.isPending}
+                busyLabel="Reactivating"
                 onClick={() => actions.reactivate.mutate(user.id)}
               >
                 Reactivate
@@ -177,6 +208,14 @@ function UserRow({ user, onEdit }: { user: AdminUser; onEdit: () => void }) {
           )}
         </td>
       </tr>
+
+      {actions.reactivate.error != null && (
+        <tr>
+          <td colSpan={5} className="px-3 pb-3">
+            <WriteFailure error={actions.reactivate.error} />
+          </td>
+        </tr>
+      )}
 
       {confirming && (
         <tr>
@@ -195,14 +234,17 @@ function UserRow({ user, onEdit }: { user: AdminUser; onEdit: () => void }) {
             <div className="mt-3 flex gap-2">
               <Button
                 variant="danger"
-                disabled={actions.deactivate.isPending}
+                busy={actions.deactivate.isPending}
+                busyLabel="Deactivating"
                 onClick={() =>
                   actions.deactivate.mutate(user.id, { onSuccess: () => setConfirming(false) })
                 }
               >
                 Deactivate
               </Button>
-              <Button onClick={() => setConfirming(false)}>Cancel</Button>
+              <Button disabled={actions.deactivate.isPending} onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
             </div>
           </td>
         </tr>
@@ -271,7 +313,8 @@ function CreateUser({ onDone }: { onDone: () => void }) {
       <div className="mt-3 flex gap-2">
         <Button
           variant="primary"
-          disabled={actions.create.isPending}
+          busy={actions.create.isPending}
+          busyLabel="Creating"
           onClick={() =>
             actions.create.mutate(
               {
@@ -288,7 +331,9 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         >
           Create
         </Button>
-        <Button onClick={onDone}>Cancel</Button>
+        <Button disabled={actions.create.isPending} onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     </Card>
   )
@@ -304,6 +349,7 @@ function EditUser({ user, onDone }: { user: AdminUser; onDone: () => void }) {
     roles: user.roles,
   })
   const [managerId, setManagerId] = useState(user.managerId ? String(user.managerId) : '')
+  const saving = actions.update.isPending || actions.setManager.isPending
 
   return (
     <Card title={`Edit ${user.fullName}`}>
@@ -352,24 +398,41 @@ function EditUser({ user, onDone }: { user: AdminUser; onDone: () => void }) {
       <div className="mt-3 flex gap-2">
         <Button
           variant="primary"
-          disabled={actions.update.isPending || actions.setManager.isPending}
+          busy={saving}
+          busyLabel="Saving"
           onClick={() => {
-            actions.update.mutate({
-              id: user.id,
-              email: form.email,
-              fullName: form.fullName,
-              departmentId: form.departmentId ? Number(form.departmentId) : null,
-              roles: form.roles,
-            })
-            actions.setManager.mutate(
-              { id: user.id, managerId: managerId ? Number(managerId) : null },
-              { onSuccess: onDone },
-            )
+            // Sequential, and the panel closes only when both have succeeded. Fired in
+            // parallel, a rejected reporting line - the server walks the whole chain for a
+            // loop, which no client-side guess can do - would still have closed the panel,
+            // because only the second call carried the close and it did not know the first had
+            // failed. The person would have been told nothing and half their edit would have
+            // landed.
+            void (async () => {
+              try {
+                await actions.update.mutateAsync({
+                  id: user.id,
+                  email: form.email,
+                  fullName: form.fullName,
+                  departmentId: form.departmentId ? Number(form.departmentId) : null,
+                  roles: form.roles,
+                })
+                await actions.setManager.mutateAsync({
+                  id: user.id,
+                  managerId: managerId ? Number(managerId) : null,
+                })
+                onDone()
+              } catch {
+                // Already rendered by WriteFailure above; the panel stays open so the value
+                // that was refused is still on screen to be corrected.
+              }
+            })()
           }}
         >
           Save
         </Button>
-        <Button onClick={onDone}>Cancel</Button>
+        <Button disabled={saving} onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     </Card>
   )

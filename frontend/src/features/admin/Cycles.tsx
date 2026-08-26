@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { useCycles } from '../../api/reviews'
 import { useCycleActions } from '../../api/admin'
-import { Button, Card, Fact, Field, TextInput, WriteFailure, when } from '../../components/Form'
+import {
+  Button,
+  Card,
+  Fact,
+  Field,
+  Select,
+  TextInput,
+  WriteFailure,
+  when,
+} from '../../components/Form'
 import { EmptyState, Loading, QueryFailure } from '../../components/States'
 import type { Cycle } from '../../api/types'
 import { AdminNav } from './AdminNav'
@@ -45,11 +54,20 @@ export function Cycles() {
                 onChange={(e) => setForm({ ...form, financialYear: e.target.value })}
               />
             </Field>
-            <Field label="Quadrimester" hint="1, 2 or 3.">
-              <TextInput
+            <Field label="Quadrimester">
+              {/*
+                There are exactly three, so it is a choice rather than a number to be typed and
+                validated. The cohort screen already offers it this way, and matching means an
+                administrator meets the same control for the same idea in both places.
+              */}
+              <Select
                 value={form.quadrimesterNo}
                 onChange={(e) => setForm({ ...form, quadrimesterNo: e.target.value })}
-              />
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </Select>
             </Field>
             <Field label="Opens on">
               <TextInput
@@ -72,7 +90,9 @@ export function Cycles() {
           <div className="mt-3">
             <Button
               variant="primary"
-              disabled={!form.startDate || !form.endDate || actions.create.isPending}
+              disabled={!form.startDate || !form.endDate}
+              busy={actions.create.isPending}
+              busyLabel="Creating"
               onClick={() =>
                 actions.create.mutate({
                   financialYear: Number(form.financialYear),
@@ -141,14 +161,16 @@ function CycleRow({ cycle }: { cycle: Cycle }) {
               />
             </Field>
             <Button
-              disabled={actions.reschedule.isPending}
+              busy={actions.reschedule.isPending}
+              busyLabel="Rescheduling"
               onClick={() => actions.reschedule.mutate({ cycleId: cycle.id, ...dates })}
             >
               Reschedule
             </Button>
             <Button
               variant="primary"
-              disabled={actions.open.isPending}
+              busy={actions.open.isPending}
+              busyLabel="Opening"
               onClick={() => actions.open.mutate(cycle.id)}
             >
               Open now
@@ -163,7 +185,8 @@ function CycleRow({ cycle }: { cycle: Cycle }) {
         <div className="mt-4 border-t border-line pt-4">
           <Button
             variant="danger"
-            disabled={actions.close.isPending}
+            busy={actions.close.isPending}
+            busyLabel="Closing"
             onClick={() => actions.close.mutate(cycle.id)}
           >
             Close the cycle

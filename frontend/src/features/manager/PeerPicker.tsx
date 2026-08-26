@@ -90,7 +90,9 @@ export function PeerPicker({ subjectId, cycleId }: { subjectId: number; cycleId:
         <div className="flex items-center gap-3">
           <Button
             variant="primary"
-            disabled={selected.length !== 2 || assign.isPending}
+            disabled={selected.length !== 2}
+            busy={assign.isPending}
+            busyLabel="Assigning"
             onClick={() => assign.mutate(selected.map((peer) => peer.id))}
           >
             Assign {selected.map((peer) => peer.name).join(' and ') || 'two peers'}

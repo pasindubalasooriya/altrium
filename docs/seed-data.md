@@ -21,7 +21,7 @@ Five people have real Asgardeo accounts. Everyone else carries a synthetic subje
 | Jane Okafor | `jane@altrium.test` | MANAGER | Engineering, reports to Elena |
 | John Alvarez | `john@altrium.test` | EMPLOYEE | Engineering, reports to Jane |
 | Kevin Doyle | `kevin@altrium.test` | HR + MANAGER (**HR Head**) | People Operations, reports to Richard |
-| Devin Marsh | `devin@altrium.test` | SUPER_ADMIN + EMPLOYEE | Engineering, reports to Elena |
+| Devin Marsh | `devin@altrium.test` | SUPER_ADMIN + EMPLOYEE | No department, no manager - a dedicated platform account (P-9.5) |
 
 ## Shape
 
@@ -53,7 +53,7 @@ Each of these exists to give a specific rule something to bite on. A three-perso
 | **Kevin (HR Head) reports to Richard (Leadership)** | P-2.6 - the HR Head's own review is conducted from outside HR, which is what keeps the own-review block absolute (P-2.2) without leaving him unreviewed. |
 | **Hana and Rosa are HR *inside* People Operations** | P-2.3 - must be blocked in their own department without an explicit grant, and blocked from their own review whatever grant they hold (P-2.2). |
 | **Tara Fields is deactivated** | P-0.7 - must vanish from peer selection, manager lists and new cycles, while her row and history survive. |
-| **Devin is an ordinary engineer with SUPER_ADMIN** | P-9.4 - platform administration is a role, not a rank, and grants no access to review content. |
+| **Devin is a dedicated platform account** | P-9.5 - held alone, outside the hierarchy, and never a reviewee. He still reads no review content (P-9.4); now he has none of his own either. Reverses the earlier seeding, where he was an ordinary engineer who also administered. |
 | **Four departments of unequal size** | HR department scoping (P-2.1) has something asymmetric to scope. |
 
 ## Resetting

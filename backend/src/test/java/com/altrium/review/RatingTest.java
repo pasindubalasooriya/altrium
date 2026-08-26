@@ -76,6 +76,11 @@ class RatingTest {
 
         ReviewCycle cycle = reviews.openCycle();
         reviews.participant(cycle, john);
+        // Section 5 step 4 has the manager read the peer ratings before setting the final one,
+        // and PeerFeedbackGate now enforces that they exist to be read. Seeded, because this
+        // test is about the rating and not about how the peer stream filled.
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-a-4-1", Role.EMPLOYEE), "Reliable");
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-b-4-1", Role.EMPLOYEE), "Collaborative");
         reviews.flush();
 
         mvc.perform(put(REVIEWS + "/" + john.getId() + "/rating")

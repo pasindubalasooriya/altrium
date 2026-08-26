@@ -41,4 +41,14 @@ public interface PeerReviewRepository
      * strand that feedback, and the manager has to be told why.
      */
     boolean existsByCycleIdAndSubjectIdAndSubmittedAtIsNotNull(Long cycleId, Long subjectId);
+
+    /**
+     * How many peers have submitted about this subject.
+     *
+     * <p>The same hazard as the method above, sharpened: this is the peer count itself, which
+     * P-3.3 forbids the subject to learn by any route. It has exactly one caller,
+     * {@link PeerFeedbackGate}, which is reached only behind {@code DIRECT_MANAGER} grounds, and
+     * it must not acquire a second one that serves a subject-facing endpoint.
+     */
+    long countByCycleIdAndSubjectIdAndSubmittedAtIsNotNull(Long cycleId, Long subjectId);
 }

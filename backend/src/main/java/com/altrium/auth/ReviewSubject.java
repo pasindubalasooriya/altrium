@@ -16,6 +16,7 @@ import com.altrium.org.Role;
  * @param departmentId the unit of HR scoping (P-2.1, P-2.3); null only for Leadership
  * @param managerId    the single reporting line that {@code isManagerOf} tests (P-1.1)
  * @param leadership   Leadership hold no review, rating or plan at all (P-1.5, P-7.2)
+ * @param superAdmin   a dedicated platform account, never a reviewee either (P-9.5)
  * @param active       soft-deleted subjects keep their history and stay readable (P-0.7)
  */
 public record ReviewSubject(
@@ -23,6 +24,7 @@ public record ReviewSubject(
         Long departmentId,
         Long managerId,
         boolean leadership,
+        boolean superAdmin,
         boolean active) {
 
     public static ReviewSubject of(AppUser user) {
@@ -31,6 +33,7 @@ public record ReviewSubject(
                 user.getDepartment() == null ? null : user.getDepartment().getId(),
                 user.getManager() == null ? null : user.getManager().getId(),
                 user.getRoles().contains(Role.LEADERSHIP),
+                user.getRoles().contains(Role.SUPER_ADMIN),
                 user.isActive());
     }
 

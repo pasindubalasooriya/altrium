@@ -120,7 +120,13 @@ export function HrGrants() {
                             </label>
                             <Button
                               variant="danger"
-                              disabled={actions.revoke.isPending}
+                              // Per grant, not per screen - one mutation object serves every
+                              // row, so a bare `isPending` would spin all of them.
+                              busy={
+                                actions.revoke.isPending &&
+                                actions.revoke.variables === grant.departmentId
+                              }
+                              busyLabel="Revoking"
                               onClick={() => actions.revoke.mutate(grant.departmentId)}
                             >
                               Revoke
@@ -171,7 +177,9 @@ export function HrGrants() {
                   </label>
                   <Button
                     variant="primary"
-                    disabled={!departmentId || actions.grant.isPending}
+                    disabled={!departmentId}
+                    busy={actions.grant.isPending}
+                    busyLabel="Granting"
                     onClick={() =>
                       actions.grant.mutate(
                         { departmentId: Number(departmentId), explicitGrant: explicit },

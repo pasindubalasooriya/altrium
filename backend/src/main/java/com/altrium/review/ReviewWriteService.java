@@ -10,6 +10,7 @@ import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
 import com.altrium.org.AppUser;
 import com.altrium.org.AppUserRepository;
+import com.altrium.org.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -53,8 +54,15 @@ import java.util.function.Function;
 @Transactional
 public class ReviewWriteService {
 
-    /** Scenario section 5: exactly two peers per subject per cycle (P-3.6). */
-    private static final int REQUIRED_PEERS = 2;
+    /**
+     * Scenario section 5: exactly two peers per subject per cycle (P-3.6).
+     *
+     * <p>Taken from {@link PeerFeedbackGate} rather than written again, because the number of
+     * peers a manager must assign and the number of submissions the manager's own writes wait
+     * for have to be the same number. Two constants would let them drift and strand a manager
+     * one submission short of a peer they were never permitted to assign.
+     */
+    private static final int REQUIRED_PEERS = PeerFeedbackGate.REQUIRED_PEER_REVIEWS;
 
     private final AuthorizationService authorization;
     private final CurrentUserService currentUser;
@@ -65,6 +73,7 @@ public class ReviewWriteService {
     private final PeerAssignmentRepository assignments;
     private final PeerReviewRepository peerReviews;
     private final ManagerReviewRepository managerReviews;
+    private final PeerFeedbackGate peerFeedbackGate;
 
     public ReviewWriteService(AuthorizationService authorization,
                               CurrentUserService currentUser,
@@ -74,7 +83,8 @@ public class ReviewWriteService {
                               SelfReviewRepository selfReviews,
                               PeerAssignmentRepository assignments,
                               PeerReviewRepository peerReviews,
-                              ManagerReviewRepository managerReviews) {
+                              ManagerReviewRepository managerReviews,
+                              PeerFeedbackGate peerFeedbackGate) {
         this.authorization = authorization;
         this.currentUser = currentUser;
         this.users = users;
@@ -84,6 +94,7 @@ public class ReviewWriteService {
         this.assignments = assignments;
         this.peerReviews = peerReviews;
         this.managerReviews = managerReviews;
+        this.peerFeedbackGate = peerFeedbackGate;
     }
 
     // ================================================================= feature 7: self-review
@@ -338,6 +349,11 @@ public class ReviewWriteService {
             if (feedback == null || feedback.isBlank()) {
                 throw new ValidationApiException("A manager review cannot be submitted empty");
             }
+            // Both peers first, by Product Owner ruling - see PeerFeedbackGate for why this
+            // deviates from scenario section 5 and why it has no override. The gate sits on the
+            // submit branch alone: the manager drafts freely while the peer stream fills up,
+            // and only the irreversible act waits.
+            peerFeedbackGate.requireBothPeersSubmitted(cycle, subjectId, "Submitting a manager review");
             review.setSubmittedAt(Instant.now());
         }
         return mapper.apply(review);
@@ -371,6 +387,15 @@ public class ReviewWriteService {
             // guarantee feedback that never arrives.
             throw new ValidationApiException(
                     peer.getFullName() + " is deactivated and cannot be assigned as a peer");
+        }
+        if (peer.getRoles().contains(Role.SUPER_ADMIN)) {
+            // P-9.5. Peer feedback is what a colleague says about working with somebody, and
+            // the Super Admin is a dedicated platform account rather than a colleague. Refused
+            // here as well as excluded from the candidate list, because the candidate list is a
+            // convenience and this is the rule.
+            throw new ValidationApiException(
+                    peer.getFullName() + " is the Super Admin, a platform account rather than a"
+                            + " colleague, and cannot be assigned as a peer (P-9.5)");
         }
         return peer;
     }

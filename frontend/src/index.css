@@ -1,12 +1,39 @@
 @import 'tailwindcss';
 
+/*
+ * Altrium's colours: amber and black.
+ *
+ * The mark is #FBB401 on black, and the whole palette is built from those two rather than the
+ * neutral blue-grey this started as. Two rules keep it legible, and both are worth stating
+ * because the obvious way to apply a brand amber breaks them:
+ *
+ *   1. The bright amber never carries white text. #FBB401 against white is about 1.9:1 - not a
+ *      near miss, a colour nobody with ordinary eyesight reads comfortably. Against black it is
+ *      about 11:1. So `--color-brand` is a fill, and what sits on it is `--color-ink`.
+ *   2. Amber as *text* has to be darkened. `--color-accent` is the same hue pulled down to
+ *      roughly 6.5:1 on the page background, which is what links, active navigation and focus
+ *      rings use. It reads as the brand colour without being the one from the logo.
+ *
+ * `--color-warn` moved from orange to red for the same reason: an orange warning next to an
+ * amber brand is two shades of the same signal, and the one that means "look at this" stops
+ * meaning anything.
+ */
 @theme {
-  --color-ink: oklch(0.25 0.02 260);
-  --color-muted: oklch(0.55 0.015 260);
-  --color-line: oklch(0.91 0.005 260);
-  --color-surface: oklch(0.99 0.002 260);
-  --color-accent: oklch(0.52 0.14 255);
-  --color-warn: oklch(0.56 0.16 40);
+  /* The brand black - text, and the ground beneath the amber. */
+  --color-ink: oklch(0.2 0.01 80);
+
+  --color-muted: oklch(0.53 0.015 80);
+  --color-line: oklch(0.9 0.008 80);
+  --color-surface: oklch(0.99 0.004 85);
+
+  /* The logo amber, #FBB401. A fill colour only: put --color-ink on it, never white. */
+  --color-brand: oklch(0.79 0.163 78);
+
+  /* Amber darkened until it is readable as text on --color-surface. Links, active nav, focus. */
+  --color-accent: oklch(0.48 0.11 68);
+
+  /* Red, not orange, so a warning is distinguishable from the brand. */
+  --color-warn: oklch(0.52 0.19 25);
 }
 
 html,

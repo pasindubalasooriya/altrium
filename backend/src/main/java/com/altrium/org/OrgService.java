@@ -3,7 +3,10 @@ package com.altrium.org;
 import com.altrium.config.ConflictApiException;
 import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
+import com.altrium.review.CohortMember;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -167,8 +170,9 @@ public class OrgService {
      */
     @Transactional(readOnly = true)
     public <T> Page<T> listUsers(String search, Long departmentId, Boolean active, Role role,
-                                 Pageable pageable, Function<AppUser, T> mapper) {
-        return users.findAll(userFilter(search, departmentId, active, role), pageable).map(mapper);
+                                 Boolean inCohort, Pageable pageable, Function<AppUser, T> mapper) {
+        return users.findAll(userFilter(search, departmentId, active, role, inCohort), pageable)
+                .map(mapper);
     }
 
     @Transactional(readOnly = true)
@@ -191,7 +195,7 @@ public class OrgService {
     // ---------------------------------------------------------------- internals
 
     private Specification<AppUser> userFilter(String search, Long departmentId, Boolean active,
-                                              Role role) {
+                                              Role role, Boolean inCohort) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (search != null && !search.isBlank()) {
@@ -212,6 +216,24 @@ public class OrgService {
                 // "the HR users on this page of everybody" - which stops being the same thing
                 // the moment the organisation outgrows one page.
                 predicates.add(cb.isMember(role, root.get("roles")));
+            }
+            if (inCohort != null) {
+                // "Who is not in a cohort yet" - the roster the cohort screen offers, which
+                // would otherwise be assembled by fetching everybody and dropping the ones
+                // already placed. That is the same mistake as the role filter: it would silently
+                // mean "the unassigned people on this page", and would tend to report an empty
+                // list rather than an error once the organisation outgrows one page.
+                //
+                // A correlated EXISTS rather than a join, because a join would need distinct and
+                // would make the total count wrong the moment the membership table gained a
+                // second row per person. It cannot today - the unique key on user_id forbids it -
+                // but a count that is only correct because of a constraint elsewhere is a count
+                // waiting to be wrong.
+                Subquery<Long> membership = query.subquery(Long.class);
+                Root<CohortMember> member = membership.from(CohortMember.class);
+                membership.select(cb.literal(1L))
+                        .where(cb.equal(member.get("user").get("id"), root.get("id")));
+                predicates.add(inCohort ? cb.exists(membership) : cb.not(cb.exists(membership)));
             }
             return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -257,11 +279,42 @@ public class OrgService {
         user.setManager(manager);
     }
 
-    /** Every user is an Employee in addition to whatever else they hold (P-0.1). */
+    /**
+     * The roles that may not be combined with {@link Role#SUPER_ADMIN} (P-9.5).
+     *
+     * <p>{@link Role#EMPLOYEE} is deliberately absent from this set, and that is not a loophole.
+     * Employee is not a job here; it is the marker that says the caller is provisioned and
+     * active, and {@code SecurityConfig} requires it on every authenticated endpoint. A Super
+     * Admin without it could not call the administration console either, so the account would
+     * hold a role it could not use.
+     *
+     * <p>What P-9.5 actually removes is being a <em>reviewee</em>, and that is enforced in
+     * {@code AuthorizationService} at step 2 rather than by taking the marker away.
+     */
+    private static final Set<Role> NOT_WITH_SUPER_ADMIN =
+            EnumSet.of(Role.MANAGER, Role.HR, Role.LEADERSHIP);
+
+    /**
+     * Every user is an Employee in addition to whatever else they hold (P-0.1), except that
+     * the Super Admin holds nothing else (P-9.5).
+     */
     private Set<Role> normaliseRoles(Set<Role> requested) {
         Set<Role> roles = EnumSet.of(Role.EMPLOYEE);
         if (requested != null) {
             roles.addAll(requested);
+        }
+        if (roles.contains(Role.SUPER_ADMIN)) {
+            Set<Role> clashes = EnumSet.copyOf(roles);
+            clashes.retainAll(NOT_WITH_SUPER_ADMIN);
+            if (!clashes.isEmpty()) {
+                // The Super Admin grants HR their departments and configures the cycles. Holding
+                // a reviewing role on top would let one account arrange the scope and then act
+                // inside it, which is the separation the whole grant mechanism exists to keep.
+                throw new ValidationApiException(
+                        "The Super Admin is a dedicated account and holds no other role. Remove "
+                                + clashes.stream().map(Enum::name).sorted().toList()
+                                + " or remove SUPER_ADMIN.");
+            }
         }
         return roles;
     }

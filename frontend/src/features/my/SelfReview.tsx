@@ -87,10 +87,10 @@ export function SelfReview() {
 
             {!submitted && (
               <div className="flex items-center gap-3">
-                <Button onClick={() => write(false)} disabled={save.isPending}>
+                <Button onClick={() => write(false)} busy={save.isPending} busyLabel="Saving">
                   Save draft
                 </Button>
-                <Button variant="primary" onClick={() => write(true)} disabled={save.isPending}>
+                <Button variant="primary" onClick={() => write(true)} busy={save.isPending} busyLabel="Submitting">
                   Submit
                 </Button>
                 <span className="text-xs text-muted">

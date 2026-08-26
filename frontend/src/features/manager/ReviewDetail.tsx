@@ -147,14 +147,16 @@ function ManagerReviewForm({
         {!submitted && (
           <div className="flex gap-3">
             <Button
-              disabled={save.isPending}
+              busy={save.isPending}
+              busyLabel="Saving"
               onClick={() => save.mutate({ feedback, submit: false })}
             >
               Save draft
             </Button>
             <Button
               variant="primary"
-              disabled={save.isPending}
+              busy={save.isPending}
+              busyLabel="Submitting"
               onClick={() => save.mutate({ feedback, submit: true })}
             >
               Submit
@@ -227,11 +229,21 @@ function RatingCard({
         <WriteFailure error={set.error ?? release.error} />
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" disabled={released || set.isPending} onClick={() => set.mutate(rating)}>
+          <Button
+            variant="primary"
+            disabled={released}
+            busy={set.isPending}
+            busyLabel="Setting"
+            onClick={() => set.mutate(rating)}
+          >
             Set rating
           </Button>
           {current && !released && (
-            <Button disabled={release.isPending} onClick={() => release.mutate()}>
+            <Button
+              busy={release.isPending}
+              busyLabel="Sharing"
+              onClick={() => release.mutate()}
+            >
               Share with the employee
             </Button>
           )}

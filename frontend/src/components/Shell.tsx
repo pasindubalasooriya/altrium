@@ -41,16 +41,34 @@ function Header({ fullName, roles }: { fullName: string; roles: Role[] }) {
   const { signOut } = useAuthContext()
 
   return (
-    <header className="border-b border-line bg-white">
+    <header className="border-b-2 border-brand bg-white">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 p-4">
-        <span className="font-semibold tracking-tight">Altrium</span>
+        {/*
+          The supplied wordmark, which already contains the name, so no text label sits beside
+          it. Height-constrained with width:auto so the aspect ratio is the file's, not ours.
+        */}
+        <img src="/altrium-logo.png" alt="Altrium" className="h-7 w-auto" />
 
         <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link to="/my/reviews">My review</Link>
-          <Link to="/my/self-review">Self-review</Link>
-          <Link to="/my/peer-tasks">Peer reviews</Link>
-          <Link to="/my/rating">My rating</Link>
-          <Link to="/my/plan">My plan</Link>
+          {/*
+            The Super Admin is a dedicated platform account and is never a reviewee (P-9.5), so
+            it has no self-review to write and no rating to read. These links are omitted rather
+            than disabled: a disabled control implies a permission that could be granted, and
+            there is no artifact behind these at all for such an account.
+
+            Still cosmetic, as the rest of this nav is. The server refuses on its own - step 2
+            of the evaluation order denies any review capability where the subject is a Super
+            Admin - and typing the URL gets that refusal rather than a screen.
+          */}
+          {!hasRole(roles, 'SUPER_ADMIN') && (
+            <>
+              <Link to="/my/reviews">My review</Link>
+              <Link to="/my/self-review">Self-review</Link>
+              <Link to="/my/peer-tasks">Peer reviews</Link>
+              <Link to="/my/rating">My rating</Link>
+              <Link to="/my/plan">My plan</Link>
+            </>
+          )}
           {hasRole(roles, 'MANAGER') && <Link to="/manager/team">My team</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/cycles">Cycles</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/reviews">HR reviews</Link>}

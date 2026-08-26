@@ -87,7 +87,8 @@ function PeerReviewForm({ task, cycleId }: { task: PeerTask; cycleId: number }) 
         <div>
           <Button
             variant="primary"
-            disabled={submit.isPending}
+            busy={submit.isPending}
+            busyLabel="Submitting"
             onClick={() => submit.mutate({ subjectId: task.subjectId, feedback, rating })}
           >
             Submit feedback

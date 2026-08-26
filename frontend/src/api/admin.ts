@@ -41,6 +41,8 @@ export interface UserFilters {
   departmentId?: number
   active?: boolean
   role?: Role
+  /** False for people not in any cohort, true for those already placed. A SQL predicate. */
+  inCohort?: boolean
 }
 
 export function useUsers(filters: UserFilters, page: number, size = 25) {
@@ -52,6 +54,7 @@ export function useUsers(filters: UserFilters, page: number, size = 25) {
         departmentId: filters.departmentId,
         active: filters.active,
         role: filters.role,
+        inCohort: filters.inCohort,
         page,
         size,
       }),
@@ -277,6 +280,10 @@ export function useCohortActions(cohortId?: number) {
   const refresh = () => {
     void queries.invalidateQueries({ queryKey: ['cohorts'] })
     void queries.invalidateQueries({ queryKey: ['cohort-members'] })
+    // The user list too, because the cohort screen asks it for "who is in no cohort" and
+    // membership has just changed. Without this the person added stays in the dropdown until
+    // something else happens to refetch, and can be added a second time to no effect.
+    void queries.invalidateQueries({ queryKey: ['admin-users'] })
   }
 
   const create = useMutation({

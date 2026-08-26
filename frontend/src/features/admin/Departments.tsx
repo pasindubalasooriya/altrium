@@ -33,7 +33,9 @@ export function Departments() {
             </div>
             <Button
               variant="primary"
-              disabled={!name.trim() || actions.create.isPending}
+              disabled={!name.trim()}
+              busy={actions.create.isPending}
+              busyLabel="Creating"
               onClick={() => actions.create.mutate(name, { onSuccess: () => setName('') })}
             >
               Create
@@ -64,7 +66,8 @@ export function Departments() {
                       />
                       <Button
                         variant="primary"
-                        disabled={actions.rename.isPending}
+                        busy={actions.rename.isPending}
+                        busyLabel="Saving"
                         onClick={() =>
                           actions.rename.mutate(editing, { onSuccess: () => setEditing(null) })
                         }

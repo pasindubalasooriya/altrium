@@ -62,12 +62,13 @@ public class UserAdminController {
             @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) Role role,
+            @RequestParam(required = false) Boolean inCohort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
 
         // The mapper is handed to the service so conversion happens inside its transaction.
         // Mapping entities out here would touch lazy proxies on a closed session.
-        Page<UserView> result = org.listUsers(search, departmentId, active, role,
+        Page<UserView> result = org.listUsers(search, departmentId, active, role, inCohort,
                 PageRequest.of(Math.max(page, 0),
                         Math.clamp(size, 1, MAX_PAGE_SIZE),
                         Sort.by("fullName").ascending()),

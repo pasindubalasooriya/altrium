@@ -50,6 +50,7 @@ public class RatingService {
     private final FinalRatingRepository ratings;
     private final RatingCalibrationRepository calibrations;
     private final ManagerReviewRepository managerReviews;
+    private final PeerFeedbackGate peerFeedbackGate;
 
     public RatingService(AuthorizationService authorization,
                          CurrentUserService currentUser,
@@ -58,7 +59,8 @@ public class RatingService {
                          CycleParticipantRepository participants,
                          FinalRatingRepository ratings,
                          RatingCalibrationRepository calibrations,
-                         ManagerReviewRepository managerReviews) {
+                         ManagerReviewRepository managerReviews,
+                         PeerFeedbackGate peerFeedbackGate) {
         this.authorization = authorization;
         this.currentUser = currentUser;
         this.users = users;
@@ -67,6 +69,7 @@ public class RatingService {
         this.ratings = ratings;
         this.calibrations = calibrations;
         this.managerReviews = managerReviews;
+        this.peerFeedbackGate = peerFeedbackGate;
     }
 
     // ================================================================= feature 12: the manager chooses
@@ -95,6 +98,13 @@ public class RatingService {
 
         ReviewCycle cycle = requireOpenCycle(cycleId);
         requireParticipant(cycle, subjectId);
+
+        // Scenario section 5 step 4: the manager reads the peer ratings and then, using them
+        // plus discretion, sets one final rating. Reading them is not something the system can
+        // observe, so what it enforces instead is that they exist to be read. Placed before the
+        // create-or-update branch rather than only on creation, so a manager cannot obtain the
+        // first rating some other way and then revise it freely.
+        peerFeedbackGate.requireBothPeersSubmitted(cycle, subjectId, "Setting a final rating");
 
         FinalRating existing = ratings.findByCycleIdAndSubjectId(cycleId, subjectId).orElse(null);
         if (existing == null) {

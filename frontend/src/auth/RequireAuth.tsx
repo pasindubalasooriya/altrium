@@ -29,11 +29,11 @@ function SignIn({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <section className="w-full max-w-sm rounded border border-line bg-white p-8 text-center">
-        <h1 className="mb-1 text-xl font-semibold tracking-tight">Altrium</h1>
+        <img src="/altrium-logo.png" alt="Altrium" className="mx-auto mb-3 h-9 w-auto" />
         <p className="mb-6 text-sm text-muted">Performance and development reviews</p>
         <button
           type="button"
-          className="w-full rounded bg-accent px-4 py-2 text-white"
+          className="w-full rounded bg-brand px-4 py-2 font-medium text-ink"
           onClick={onSignIn}
         >
           Sign in

@@ -215,6 +215,13 @@ public class CycleService {
             throw new ValidationApiException(
                     user.getFullName() + " is Leadership and is never a reviewee (P-1.5)");
         }
+        if (user.getRoles().contains(Role.SUPER_ADMIN)) {
+            // Same reasoning one role along (P-9.5). The Super Admin is a dedicated platform
+            // account, so enrolling one would create a participant whose every artifact the
+            // authorization layer refuses - a cohort row that quietly does nothing.
+            throw new ValidationApiException(
+                    user.getFullName() + " is the Super Admin and is never a reviewee (P-9.5)");
+        }
         if (!user.isActive()) {
             throw new ValidationApiException(
                     "A deactivated user cannot be added to a cohort (P-0.7)");

@@ -111,6 +111,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
             WHERE u.active = true
               AND u.id <> :subjectId
               AND (:managerId IS NULL OR u.id <> :managerId)
+              AND com.altrium.org.Role.SUPER_ADMIN NOT MEMBER OF u.roles
               AND (:name IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :name, '%')))
             ORDER BY u.fullName
             """)

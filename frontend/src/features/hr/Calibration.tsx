@@ -142,7 +142,9 @@ export function Calibration() {
                 <div>
                   <Button
                     variant="primary"
-                    disabled={Boolean(current.releasedAt) || calibrate.isPending}
+                    disabled={Boolean(current.releasedAt)}
+                    busy={calibrate.isPending}
+                    busyLabel="Calibrating"
                     onClick={() => calibrate.mutate({ rating, note })}
                   >
                     Calibrate

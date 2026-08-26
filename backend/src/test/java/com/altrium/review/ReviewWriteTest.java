@@ -487,6 +487,11 @@ class ReviewWriteTest {
 
         ReviewCycle cycle = reviews.openCycle();
         reviews.participant(cycle, john);
+        // Both peers first: submitting a manager review waits for them by Product Owner ruling
+        // (PeerFeedbackGate). Seeded rather than driven through the API, because what this test
+        // is about is the manager review reaching the subject, not how the peer stream filled.
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-a-3-7", Role.EMPLOYEE), "Reliable");
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-b-3-7", Role.EMPLOYEE), "Collaborative");
         reviews.flush();
 
         mvc.perform(put(REVIEWS + "/" + john.getId() + "/manager-review")

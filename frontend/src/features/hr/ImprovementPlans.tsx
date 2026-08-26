@@ -127,7 +127,8 @@ function PlanCard({ plan }: { plan: ImprovementPlan }) {
           </p>
           <Button
             variant="primary"
-            disabled={cosign.isPending}
+            busy={cosign.isPending}
+            busyLabel="Co-signing"
             onClick={() => cosign.mutate(plan.id)}
           >
             Co-sign and share with {plan.userName}
@@ -140,7 +141,9 @@ function PlanCard({ plan }: { plan: ImprovementPlan }) {
           </Field>
           <div>
             <Button
-              disabled={!witnessName.trim() || witness.isPending}
+              disabled={!witnessName.trim()}
+              busy={witness.isPending}
+              busyLabel="Recording"
               onClick={() => witness.mutate({ planId: plan.id, witnessName })}
             >
               Record witness

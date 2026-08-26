@@ -116,10 +116,15 @@ public class SeedData implements ApplicationRunner {
         person("sofia", null, "Sofia Rossi", engineering, "tom");
         person("liam", null, "Liam O'Connor", engineering, "tom");
 
-        // Platform administration is a role, not a place in the hierarchy: Devin is an
-        // ordinary engineer who also administers the system. Crucially that grants no access
-        // to review content (P-9.4) - a useful thing to be able to demonstrate.
-        person("devin", SUB_DEVIN, "Devin Marsh", engineering, "elena", Role.SUPER_ADMIN);
+        // A dedicated platform account (P-9.5), not a person who also administers. No
+        // department and no manager, because both exist to place a reviewee - a department is
+        // the unit of HR scoping and a manager is who reviews you, and neither applies to an
+        // account that is never reviewed.
+        //
+        // This account grants the HR users their departments and configures the cycles. Giving
+        // it a reviewing role on top would let one account arrange the scope and then act
+        // inside it, which is the separation the grant mechanism exists to keep.
+        person("devin", SUB_DEVIN, "Devin Marsh", null, null, Role.SUPER_ADMIN);
 
         // Deactivated (P-0.7): must disappear from peer selection, manager lists and new
         // cycles, while the row and any history survive.

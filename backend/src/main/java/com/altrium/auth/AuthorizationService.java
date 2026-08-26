@@ -226,6 +226,18 @@ public class AuthorizationService {
             return AuthorizationDecision.deny("P-1.5", "Leadership is never a reviewee");
         }
 
+        if (capability.concernsReviewContent() && subject.superAdmin()) {
+            // P-9.5. The Super Admin is a dedicated platform account rather than a person who
+            // also administers, so there is no review, rating or plan about them for anybody to
+            // read - not their manager, not HR, not themselves.
+            //
+            // Structural rather than left to the cohort screen refusing to enrol them. That
+            // refusal is the civil error a person meets; this is the guarantee. A row inserted
+            // by a migration, a fixture or a future feature cannot make a Super Admin reviewable
+            // without passing through here.
+            return AuthorizationDecision.deny("P-9.5", "The Super Admin is never a reviewee");
+        }
+
         // P-2.2, the own-review block. Decided here, at step 2, precisely so that the
         // explicit-grant override at step 5 cannot reach it - an HR user's grants, however
         // wide and whatever flag they carry, never apply to their own case.

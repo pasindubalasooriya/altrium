@@ -57,7 +57,9 @@ export function Cohorts() {
             </div>
             <Button
               variant="primary"
-              disabled={!form.name.trim() || actions.create.isPending}
+              disabled={!form.name.trim()}
+              busy={actions.create.isPending}
+              busyLabel="Creating"
               onClick={() =>
                 actions.create.mutate(
                   {
@@ -134,7 +136,14 @@ function Members({ cohort }: { cohort: Cohort }) {
   const members = useCohortMembers(cohort.id)
   const actions = useCohortActions(cohort.id)
   const [search, setSearch] = useState('')
-  const candidates = useUsers({ search, active: true }, 0, 10)
+  const [picked, setPicked] = useState('')
+
+  // A hundred is the server's own page ceiling, so this asks for as much as it will give and
+  // then admits when that was not everybody, rather than pretending a truncated list is the
+  // full set. Nothing here assumes Altrium is small.
+  const candidates = useUsers({ search, active: true, inCohort: false }, 0, 100)
+  const unassigned = candidates.data?.content ?? []
+  const truncated = (candidates.data?.totalElements ?? 0) > unassigned.length
 
   return (
     <Card title={`${cohort.name} members`}>
@@ -155,7 +164,14 @@ function Members({ cohort }: { cohort: Cohort }) {
               <span className="ml-auto">
                 <Button
                   variant="danger"
-                  disabled={actions.removeMember.isPending}
+                  // Scoped to the row actually in flight. One mutation object serves every row,
+                  // so a bare `isPending` would set all of them spinning and claim the whole
+                  // list was being removed. `variables` is the argument of the call in progress.
+                  busy={
+                    actions.removeMember.isPending &&
+                    actions.removeMember.variables === member.userId
+                  }
+                  busyLabel="Removing"
                   onClick={() => actions.removeMember.mutate(member.userId)}
                 >
                   Remove
@@ -182,40 +198,75 @@ function Members({ cohort }: { cohort: Cohort }) {
       )}
 
       <div className="border-t border-line pt-4">
-        <div className="w-72">
-          <Field label="Add somebody">
-            <TextInput
-              value={search}
-              placeholder="Search by name"
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </Field>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-80">
+            <Field label="Add somebody">
+              {/*
+                Only people who are in no cohort at all, and that is `inCohort=false` in the
+                query rather than a filter over a fetched page. Offering everybody was the real
+                problem: an administrator could pick somebody already placed, and the add would
+                quietly move them out of the cohort they were in, with the list giving no hint
+                that it was about to.
+              */}
+              <Select
+                value={picked}
+                disabled={candidates.isPending || unassigned.length === 0}
+                onChange={(e) => setPicked(e.target.value)}
+              >
+                <option value="">
+                  {candidates.isPending
+                    ? 'Loading...'
+                    : unassigned.length === 0
+                      ? 'Everybody is already in a cohort'
+                      : 'Choose a person'}
+                </option>
+                {unassigned.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName}
+                    {user.departmentName ? ` - ${user.departmentName}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <Button
+            variant="primary"
+            disabled={!picked}
+            busy={actions.addMember.isPending}
+            busyLabel="Adding"
+            onClick={() =>
+              actions.addMember.mutate(Number(picked), { onSuccess: () => setPicked('') })
+            }
+          >
+            Add
+          </Button>
         </div>
-        {search && candidates.data && (
-          <ul className="mt-2 grid gap-1 text-sm">
-            {candidates.data.content.map((user) => (
-              <li key={user.id}>
-                <button
-                  type="button"
-                  className="w-full rounded border border-line px-3 py-2 text-left"
-                  onClick={() => actions.addMember.mutate(user.id, { onSuccess: () => setSearch('') })}
-                >
-                  {user.fullName}
-                  <span className="ml-2 text-xs text-muted">
-                    {user.departmentName ?? 'no department'}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {candidates.data.content.length === 0 && (
-              <li className="text-muted">Nobody matches that name.</li>
-            )}
-          </ul>
+
+        {/*
+          The dropdown holds one page. Rather than silently showing the first hundred names and
+          letting an administrator conclude somebody is missing, say so and offer the search -
+          which narrows the same server query, so the shortened list is still the whole answer.
+        */}
+        {truncated && (
+          <div className="mt-3 w-80">
+            <Field
+              label="Too many to list"
+              hint={`${candidates.data?.totalElements} people are in no cohort. Search to narrow the list.`}
+            >
+              <TextInput
+                value={search}
+                placeholder="Search by name"
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </Field>
+          </div>
         )}
+
         <WriteFailure error={actions.addMember.error} />
         <p className="mt-2 text-xs text-muted">
-          Adding somebody moves them out of any other cohort. A person belongs to exactly one,
-          which is what makes "assessed once a year, in a fixed quadrimester" a guarantee.
+          A person belongs to exactly one cohort, which is what makes "assessed once a year, in
+          a fixed quadrimester" a guarantee. Somebody already in another cohort is not offered
+          here; move them from that cohort instead.
         </p>
       </div>
     </Card>

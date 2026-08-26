@@ -139,7 +139,9 @@ function OpenPlanForm({ userId, suspended }: { userId: number; suspended: boolea
         <div>
           <Button
             variant="primary"
-            disabled={!deadline || open.isPending}
+            disabled={!deadline}
+            busy={open.isPending}
+            busyLabel="Opening"
             onClick={() => open.mutate({ consequenceClause, deadline })}
           >
             Open plan
