@@ -73,6 +73,30 @@ public class PlanGoal {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    /**
+     * Where the goal stands between manager and employee. Null on an improvement goal, which
+     * has no agreement step (see {@link GoalAgreement}).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "agreement", length = 16)
+    private GoalAgreement agreement;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "agreed_at")
+    private Instant agreedAt;
+
+    /**
+     * The employee's own account of how the goal is going.
+     *
+     * <p>Kept apart from {@link #detail}, which belongs to the manager and is fixed once the
+     * goal is agreed. Sharing one field would let progress reporting overwrite the goal that
+     * was agreed to, which is the exact thing fixing the wording exists to prevent.
+     */
+    @Column(name = "progress_note", columnDefinition = "TEXT")
+    private String progressNote;
+
     /** Who approved it. A completed goal with no approver would be one that completed itself. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by")
@@ -93,6 +117,9 @@ public class PlanGoal {
         this.title = title;
         this.detail = detail;
         this.targetDate = targetDate;
+        // Drafted, never submitted, so a half-written goal is not on the employee's plan the
+        // instant their manager starts typing it.
+        this.agreement = GoalAgreement.DRAFT;
     }
 
     public PlanGoal(ImprovementPlan improvementPlan, String title, String detail, LocalDate targetDate) {
@@ -116,6 +143,56 @@ public class PlanGoal {
 
     public boolean isImprovementGoal() {
         return improvementPlan != null;
+    }
+
+    public GoalAgreement getAgreement() {
+        return agreement;
+    }
+
+    public Instant getSubmittedAt() {
+        return submittedAt;
+    }
+
+    public Instant getAgreedAt() {
+        return agreedAt;
+    }
+
+    public String getProgressNote() {
+        return progressNote;
+    }
+
+    public void setProgressNote(String progressNote) {
+        this.progressNote = progressNote;
+    }
+
+    /** Submitted to the employee, who can now see it and agree to it. */
+    public void submit() {
+        this.agreement = GoalAgreement.PENDING;
+        this.submittedAt = Instant.now();
+    }
+
+    /** Agreed by the employee. The wording is fixed from here. */
+    public void agree() {
+        this.agreement = GoalAgreement.AGREED;
+        this.agreedAt = Instant.now();
+    }
+
+    public boolean isDraft() {
+        return agreement == GoalAgreement.DRAFT;
+    }
+
+    public boolean isAgreed() {
+        return agreement == GoalAgreement.AGREED;
+    }
+
+    /**
+     * Whether the employee whose plan this is may see it.
+     *
+     * <p>An improvement goal has no agreement and is governed by the plan's co-signature
+     * instead (P-5.3), so it is visible here and gated a level up.
+     */
+    public boolean isVisibleToSubject() {
+        return !isDraft();
     }
 
     /**

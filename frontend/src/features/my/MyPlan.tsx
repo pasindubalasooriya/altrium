@@ -1,14 +1,14 @@
 import { Link } from 'react-router-dom'
 import {
-  useAddGoal,
+  useAgreeGoal,
   useEditGoal,
   useMyDevelopmentPlan,
   useRemoveGoal,
+  useReportProgress,
 } from '../../api/plans'
-import { useCurrentUser } from '../../auth/useCurrentUser'
 import { Card, Fact, when } from '../../components/Form'
 import { Loading, QueryFailure } from '../../components/States'
-import { AddGoal, GoalList, type GoalActions } from '../plan/PlanGoals'
+import { GoalList, type GoalActions } from '../plan/PlanGoals'
 
 /**
  * The employee's own development plan.
@@ -17,26 +17,36 @@ import { AddGoal, GoalList, type GoalActions } from '../plan/PlanGoals'
  * state that means "you have none". Everybody has one from the moment they join (scenario
  * section 8), and a UI that offered to create one would misdescribe that.
  *
- * The employee writes goals and reports progress; they do not approve completion and do not
- * move target dates. Those controls are absent here rather than disabled - `canApprove` is
- * false - because they belong to the manager (P-5.2, P-5.5), and a disabled control implies a
- * permission that might arrive.
+ * **The employee does not write the goals.** Their manager drafts them and submits them, and
+ * the employee's part is to agree and then report progress (P-5.9). That is a Product Owner
+ * ruling and a deviation from scenario section 8, which describes the plan as collaborative
+ * between the two of them - the collaboration survives as agreement rather than as shared
+ * authorship.
+ *
+ * <p>So there is no "add a goal" here, and no approval or target-date control either: those
+ * belong to the manager (P-5.2, P-5.5). All of them are absent rather than disabled, because a
+ * disabled control implies a permission that might one day arrive.
  */
 export function MyPlan() {
-  const { data: me } = useCurrentUser()
   const { data: plan, isPending, error } = useMyDevelopmentPlan()
 
   const planKey = ['development-plan', 'me']
-  const add = useAddGoal(me?.id, planKey)
+  const agree = useAgreeGoal(planKey)
+  const progress = useReportProgress(planKey)
   const edit = useEditGoal(planKey)
   const remove = useRemoveGoal(planKey)
 
+  // No `submit`, and `add` and `remove` are here only to satisfy the shared type - the server
+  // refuses all three for the employee (P-5.9), and no control on this screen calls them. The
+  // two the employee actually holds are agreeing and reporting progress.
   const actions: GoalActions = {
-    add: add.mutate,
+    add: () => undefined,
     edit: edit.mutate,
     remove: remove.mutate,
-    error: add.error ?? edit.error ?? remove.error,
-    busy: add.isPending || edit.isPending || remove.isPending,
+    agree: agree.mutate,
+    progress: progress.mutate,
+    error: agree.error ?? progress.error,
+    busy: agree.isPending || progress.isPending,
   }
 
   if (isPending) {
@@ -61,7 +71,7 @@ export function MyPlan() {
           </p>
           <p className="mt-2 text-sm text-muted">
             Paused {when(plan.suspendedAt)} ·{' '}
-            <Link className="text-accent" to="/my/improvement-plan">
+            <Link className="text-accent underline" to="/my/improvement-plan">
               See the improvement plan
             </Link>
           </p>
@@ -74,7 +84,6 @@ export function MyPlan() {
           <div className="mt-4">
             <GoalList goals={plan.goals} actions={actions} canApprove={false} readOnly={suspended} />
           </div>
-          {!suspended && <AddGoal actions={actions} withDate={false} />}
         </Card>
       </div>
     </>

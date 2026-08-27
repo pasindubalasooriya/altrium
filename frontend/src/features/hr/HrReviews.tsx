@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom'
 import { CycleSelect, useSelectedCycle } from '../../components/CycleSelect'
 import { usePermittedReviews } from '../../api/reviews'
 import { Pager, usePaging } from '../../components/Pager'
 import { EmptyState, Loading, QueryFailure } from '../../components/States'
+import { RowLink } from '../../components/RowLink'
+import { hrIsWaitedOn } from '../manager/waiting'
 
 /**
  * The reviews in HR's granted departments.
@@ -53,12 +54,18 @@ export function HrReviews() {
                   <td className="p-3">{review.subjectName}</td>
                   <td className="p-3 text-muted">{review.departmentName ?? '-'}</td>
                   <td className="p-3 text-right">
-                    <Link
-                      className="text-accent"
+                    {/*
+                      A rating the manager has set and nobody has signed off. Until HR act, the
+                      manager cannot share it (P-4.8), so this row is holding up somebody else's
+                      work as well as their own.
+                    */}
+                    <RowLink
                       to={`/hr/reviews/${review.subjectId}?cycleId=${cycleId}`}
+                      dot={hrIsWaitedOn(review) !== null}
+                      dotLabel={hrIsWaitedOn(review) ?? undefined}
                     >
                       Open and calibrate
-                    </Link>
+                    </RowLink>
                   </td>
                 </tr>
               ))}

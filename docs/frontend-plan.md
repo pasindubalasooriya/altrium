@@ -81,13 +81,12 @@ Two states the shell renders before any feature exists, because the seed data gu
 | `/my/reviews` | `GET /api/reviews/cycles`, `GET /api/reviews?cycleId=`, `GET /api/reviews/{me}?cycleId=` |
 | `/my/self-review` | `PUT /api/reviews/self-review` |
 | `/my/peer-tasks` | `GET /api/reviews/my-peer-assignments`, `POST /api/reviews/{subjectId}/peer-review` |
-| `/my/rating` | `GET /api/reviews/my-rating` |
 | `/my/plan` | `GET /api/plans/development/me`, goal create, edit, delete |
 | `/my/improvement-plan` | `GET /api/plans/improvement/me` |
 
 **Peer anonymity is structural on this side too.** No component under `features/my/` imports a peer-review type, and the own-record screen renders strictly from `visibleSections`. Peer *count* is equally off limits: no "2 peers assigned" badge, no submission progress bar on the employee's own record.
 
-**`/my/rating` renders "no rating yet" and "rating withheld" identically.** `OwnRatingView` was built so the two are indistinguishable; a UI saying "awaiting release" for one and "not yet rated" for the other would put back the disclosure the DTO removed.
+**The rating renders "no rating yet" and "rating withheld" identically**, on `/my/reviews`. It had a page of its own at `/my/rating` until it turned out to be saying what the record screen already said, on the same cycle; two screens for one fact is two places for the withheld wording to drift. The endpoint stays - it takes no subject id, so it cannot be asked the question P-4.4 forbids, and its denial tests are evidence for the policy. `visibleSections` deliberately keeps `FINAL_RATING` tied to whether a rating arrived rather than to grounds, for the same reason: reporting grounds would separate "not rated" from "rated but not shared".
 
 **`/my/improvement-plan`** uses `hasPlan`. Before HR co-signs, the plan is invisible, and it shows nothing the *same way* it would if no plan existed.
 
@@ -169,7 +168,7 @@ Server-paged users table - the one place the stack explicitly says the console m
 
 - `client.ts` maps 401, 403, 409 and 400 to distinct outcomes *(done in phase 2)*
 - the own-record screen renders only the sections named in `visibleSections`, and given a response that wrongly contained peer data, still renders none
-- `/my/rating` renders identically for a withheld rating and an absent one
+- the own-record screen renders identically for a withheld rating and an absent one
 - `Pager` requests page 2 from the server and never slices a fetched array
 
 These **do not replace the backend denial tests** and must not be described as if they did. A React test proves a control is hidden; the `MockMvc` denial tests prove access is refused. The backend suite remains the security evidence.

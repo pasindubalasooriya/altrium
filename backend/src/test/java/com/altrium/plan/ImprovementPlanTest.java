@@ -65,6 +65,23 @@ class ImprovementPlanTest {
     @Autowired
     private HrGrantService grants;
 
+    /**
+     * Submits a drafted development goal and has the employee agree to it (P-5.9).
+     *
+     * <p>A goal that is only drafted is invisible to the employee, so a test that reads their
+     * plan back would find nothing - which is correct behaviour, and not what these tests are
+     * about.
+     */
+    private void agree(String goalJson, String manager, String employee) throws Exception {
+        long goalId = ((Number) JsonPath.read(goalJson, "$.id")).longValue();
+        mvc.perform(post(PDPS + "/goals/" + goalId + "/submission")
+                        .header("Authorization", bearer(manager)))
+                .andExpect(status().isOk());
+        mvc.perform(post(PDPS + "/goals/" + goalId + "/agreement")
+                        .header("Authorization", bearer(employee)))
+                .andExpect(status().isOk());
+    }
+
     private String bearer(String handle) {
         return "Bearer " + OrgFixture.tokenFor(handle);
     }
@@ -100,12 +117,14 @@ class ImprovementPlanTest {
         john.setManager(elena);
         org.flush();
 
-        mvc.perform(post(PDPS + "/" + john.getId() + "/goals")
-                        .header("Authorization", bearer("john"))
+        String elenaGoal = mvc.perform(post(PDPS + "/" + john.getId() + "/goals")
+                        .header("Authorization", bearer("elena"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Lead a migration end to end","targetDate":"2027-06-30"}"""))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        agree(elenaGoal, "elena", "john");
 
         openPlan("elena", john, CLAUSE);
 
@@ -134,7 +153,7 @@ class ImprovementPlanTest {
         // 409: he holds WRITE_DEVELOPMENT_PLAN and it is the suspended plan that refuses.
         // Accepting goals here would defeat the point of suspending it.
         mvc.perform(post(PDPS + "/" + john.getId() + "/goals")
-                        .header("Authorization", bearer("john"))
+                        .header("Authorization", bearer("elena"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Something unrelated"}"""))
@@ -424,7 +443,7 @@ class ImprovementPlanTest {
 
         // A development goal, half done, before any of this starts.
         String pdpGoal = mvc.perform(post(PDPS + "/" + john.getId() + "/goals")
-                        .header("Authorization", bearer("john"))
+                        .header("Authorization", bearer("elena"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Lead a migration end to end",
@@ -432,6 +451,7 @@ class ImprovementPlanTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long pdpGoalId = ((Number) JsonPath.read(pdpGoal, "$.id")).longValue();
+        agree(pdpGoal, "elena", "john");
 
         long planId = openPlan("elena", john, CLAUSE);
         mvc.perform(post(PIPS + "/" + planId + "/cosign").header("Authorization", bearer("hana")))

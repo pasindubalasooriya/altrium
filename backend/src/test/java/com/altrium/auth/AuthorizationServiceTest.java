@@ -317,13 +317,17 @@ class AuthorizationServiceTest {
             // would make that review pointless. Note the grounds: SELF, never HR_IN_SCOPE.
             assertThat(authorization.require(Capability.READ_FINAL_RATING, self,
                     ArtifactState.released(true))).isEqualTo(Grounds.SELF);
-            assertThat(authorization.requireForUser(Capability.READ_MANAGER_REVIEW, kevin.getId()))
-                    .isEqualTo(Grounds.SELF);
+            assertThat(authorization.require(Capability.READ_MANAGER_REVIEW, self,
+                    ArtifactState.released(true))).isEqualTo(Grounds.SELF);
             assertThat(authorization.requireForUser(Capability.READ_DEVELOPMENT_PLAN, kevin.getId()))
                     .isEqualTo(Grounds.SELF);
 
-            // The release gate binds him exactly as it binds everyone.
+            // The release gate binds him exactly as it binds everyone, and it binds the words
+            // as well as the number - the settled decision says "their own *released* rating and
+            // manager feedback", and the two travel together (P-4.4).
             assertDenied(() -> authorization.require(Capability.READ_FINAL_RATING, self,
+                    ArtifactState.released(false)));
+            assertDenied(() -> authorization.require(Capability.READ_MANAGER_REVIEW, self,
                     ArtifactState.released(false)));
         }
 

@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -545,5 +546,249 @@ class RatingTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(rating(Rating.EXCEEDS_EXPECTATIONS)))
                 .andExpect(status().isForbidden());
+    }
+
+    // ================================================================ P-4.8: HR sign-off
+
+    /** A subject with a manager, two peer reviews in, and an HR user granted their department. */
+    private record SignOff(ReviewCycle cycle, AppUser subject, AppUser manager, AppUser hr) {
+    }
+
+    private SignOff signOffScene(String tag) {
+        Department engineering = org.department("Engineering-" + tag);
+        Department people = org.department("People-" + tag);
+        AppUser elena = org.userIn(engineering, "elena-" + tag, Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-" + tag, Role.EMPLOYEE);
+        AppUser kevin = org.userIn(people, "kevin-" + tag, Role.EMPLOYEE, Role.HR);
+        john.setManager(elena);
+        org.flush();
+        grants.grant(kevin.getId(), engineering.getId(), false, null, g -> g.getId());
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.peerReview(cycle, john, org.userIn(engineering, "pa-" + tag, Role.EMPLOYEE), "Reliable");
+        reviews.peerReview(cycle, john, org.userIn(engineering, "pb-" + tag, Role.EMPLOYEE), "Collaborative");
+        reviews.flush();
+
+        return new SignOff(cycle, john, elena, kevin);
+    }
+
+    private void setRating(SignOff s, String tag) throws Exception {
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/rating")
+                        .param("cycleId", s.cycle().getId().toString())
+                        .header("Authorization", bearer("elena-" + tag))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rating(Rating.MEETS_EXPECTATIONS)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("P-4.8: a rating cannot be shared until HR have signed it off")
+    void P_4_8_releaseWaitsForHrSignOff() throws Exception {
+        SignOff s = signOffScene("gate");
+        setRating(s, "gate");
+
+        String release = REVIEWS + "/" + s.subject().getId() + "/rating/release";
+        String cycleId = s.cycle().getId().toString();
+
+        // 409 and not 403: Elena holds RELEASE_RATING throughout, and it is the state of the
+        // sign-off that refuses. A denial would tell her she is the wrong person, which is false.
+        mvc.perform(post(release).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-gate")))
+                .andExpect(status().isConflict());
+
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/approval")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-gate")))
+                .andExpect(status().isOk())
+                // Recorded as a calibration row whose before and after are equal - the table
+                // exists to say who touched this rating, and an approval is exactly that.
+                .andExpect(jsonPath("$.from").value("MEETS_EXPECTATIONS"))
+                .andExpect(jsonPath("$.to").value("MEETS_EXPECTATIONS"))
+                .andExpect(jsonPath("$.by").value("kevin-gate"));
+
+        mvc.perform(post(release).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-gate")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("P-4.8: calibrating is a sign-off too - HR need not then also approve")
+    void P_4_8_calibrationSignsOffAsWell() throws Exception {
+        SignOff s = signOffScene("calib");
+        setRating(s, "calib");
+        String cycleId = s.cycle().getId().toString();
+
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/rating/calibration")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-calib"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":\"EXCEEDS_EXPECTATIONS\",\"note\":\"normalised\"}"))
+                .andExpect(status().isOk());
+
+        // HR have been through it and moved it, which is the stronger form of having looked.
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/release")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-calib")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("P-4.8: approving an unchanged rating is its own act, and only once")
+    void P_4_8_approvalIsSeparateFromCalibrationAndHappensOnce() throws Exception {
+        SignOff s = signOffScene("once");
+        setRating(s, "once");
+        String cycleId = s.cycle().getId().toString();
+        String approval = REVIEWS + "/" + s.subject().getId() + "/rating/approval";
+
+        // Calibrating to the value it already holds is still refused, and now says where to go.
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/rating/calibration")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-once"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rating(Rating.MEETS_EXPECTATIONS)))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(post(approval).param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-once")))
+                .andExpect(status().isOk());
+
+        // A second sign-off is a 409, not a silent success: the caller believes they are doing
+        // something, and the first one is already what unlocked the release.
+        mvc.perform(post(approval).param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-once")))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("P-2.2/P-4.8: an HR user cannot sign off their own rating, explicit grant or not")
+    void P_4_8_hrCannotSignOffTheirOwnRating() throws Exception {
+        Department people = org.department("People-self");
+        AppUser richard = org.user("richard-self", Role.EMPLOYEE, Role.LEADERSHIP);
+        AppUser kevin = org.userIn(people, "kevin-self", Role.EMPLOYEE, Role.HR);
+        kevin.setManager(richard);
+        org.flush();
+        grants.grant(kevin.getId(), people.getId(), true, null, g -> g.getId());
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, kevin);
+        reviews.peerReview(cycle, kevin, org.userIn(people, "pa-self", Role.EMPLOYEE), "Reliable");
+        reviews.peerReview(cycle, kevin, org.userIn(people, "pb-self", Role.EMPLOYEE), "Steady");
+        reviews.flush();
+
+        mvc.perform(put(REVIEWS + "/" + kevin.getId() + "/rating")
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("richard-self"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rating(Rating.MEETS_EXPECTATIONS)))
+                .andExpect(status().isOk());
+
+        // The explicit grant lifts the own-department block and never the own-review block.
+        mvc.perform(post(REVIEWS + "/" + kevin.getId() + "/rating/approval")
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("kevin-self")))
+                .andExpect(status().isForbidden());
+
+        // And because he is the only HR user with authority over his own department, nobody
+        // could sign it off. The gate stands aside rather than stranding the rating - his
+        // manager shares it, which is the alternative to a number that never reaches him.
+        mvc.perform(post(REVIEWS + "/" + kevin.getId() + "/rating/release")
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("richard-self")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("P-4.7/P-4.8: the manager is told whether HR have signed off; the subject is not")
+    void P_4_8_signOffStateIsWithheldFromTheSubject() throws Exception {
+        SignOff s = signOffScene("view");
+        setRating(s, "view");
+        String cycleId = s.cycle().getId().toString();
+        String record = REVIEWS + "/" + s.subject().getId();
+
+        mvc.perform(get(record).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating.signedOffByHr").value(false));
+
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/approval")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-view")))
+                .andExpect(status().isOk());
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/release")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-view")))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(record).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating.signedOffByHr").value(true));
+
+        // John now reads his released rating, and learns nothing about who signed it off.
+        // Whether HR were through it is part of the calibration trail, and READ_RATING_AUDIT
+        // has no SELF grounds (P-4.7). Absent, not false - a false is an answer.
+        mvc.perform(get(record).param("cycleId", cycleId)
+                        .header("Authorization", bearer("john-view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating.rating").value("MEETS_EXPECTATIONS"))
+                .andExpect(jsonPath("$.finalRating.signedOffByHr").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("P-4.8: the list says whose turn a rating is, and never tells the subject")
+    void P_4_8_theListSaysWhoseTurnTheRatingIs() throws Exception {
+        SignOff s = signOffScene("stage");
+        String cycleId = s.cycle().getId().toString();
+        String subject = "$.content[?(@.subjectId == " + s.subject().getId() + ")].ratingStage";
+
+        // Elena's own list. Nothing set yet.
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-stage")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(subject).value(hasItem("NOT_SET")));
+
+        setRating(s, "stage");
+
+        // Her turn is over and Kevin's has begun. Both are told the same thing, because both
+        // have to act on it - he signs off, she waits.
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-stage")))
+                .andExpect(jsonPath(subject).value(hasItem("AWAITING_SIGN_OFF")));
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-stage")))
+                .andExpect(jsonPath(subject).value(hasItem("AWAITING_SIGN_OFF")));
+
+        // John's own row on his own list carries nothing. Whether HR have been through his
+        // rating is the calibration trail, which has no SELF ground (P-4.7) - and "a rating
+        // exists and is sitting with HR" is exactly what release exists to withhold.
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("john-stage")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].ratingStage").doesNotExist());
+
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/approval")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-stage")))
+                .andExpect(status().isOk());
+
+        // Back to Elena, and the flag says so.
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-stage")))
+                .andExpect(jsonPath(subject).value(hasItem("SIGNED_OFF")));
+
+        mvc.perform(post(REVIEWS + "/" + s.subject().getId() + "/rating/release")
+                        .param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-stage")))
+                .andExpect(status().isOk());
+
+        // Nobody's turn now, so neither of them is prompted again.
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("elena-stage")))
+                .andExpect(jsonPath(subject).value(hasItem("SHARED")));
+        mvc.perform(get(REVIEWS).param("cycleId", cycleId)
+                        .header("Authorization", bearer("kevin-stage")))
+                .andExpect(jsonPath(subject).value(hasItem("SHARED")));
     }
 }

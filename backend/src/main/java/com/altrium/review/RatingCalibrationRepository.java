@@ -1,6 +1,8 @@
 package com.altrium.review;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -20,4 +22,9 @@ public interface RatingCalibrationRepository extends JpaRepository<RatingCalibra
      * audit row records a change that no longer holds.
      */
     boolean existsByFinalRatingId(Long finalRatingId);
+
+    /** Which of these ratings have been signed off, in one query rather than one each. */
+    @Query("select distinct c.finalRating.id from RatingCalibration c"
+            + " where c.finalRating.id in :ratingIds")
+    List<Long> signedOffRatingIds(@Param("ratingIds") java.util.Collection<Long> ratingIds);
 }

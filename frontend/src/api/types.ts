@@ -76,6 +76,23 @@ export interface ReviewSummary {
   subjectActive: boolean
   cycleId: number
   cycleLabel: string
+  /**
+   * How many assigned peers have submitted about this person.
+   *
+   * **Absent, not zero, where the caller has no grounds to read this subject's peer feedback**
+   * - which includes their own row, since `READ_PEER_REVIEW` has no `SELF` ground. A zero is
+   * the count, and P-3.3 withholds the count from the subject. Treat null and 0 as different
+   * facts here: null means "not yours to know", 0 means "none yet".
+   */
+  peerReviewsSubmitted: number | null
+  /**
+   * Where the rating has got to, so each side can be told when it is their turn (P-4.8).
+   *
+   * **Null where the caller has no grounds to know**, which includes the subject's own row:
+   * `READ_RATING_AUDIT` has no `SELF` ground (P-4.7), and "a rating exists and is sitting with
+   * HR" is exactly what release exists to withhold. Null is not a fifth state.
+   */
+  ratingStage: 'NOT_SET' | 'AWAITING_SIGN_OFF' | 'SIGNED_OFF' | 'SHARED' | null
 }
 
 export interface SelfReview {
@@ -101,6 +118,14 @@ export interface PeerReview {
 }
 
 export interface FinalRating {
+  /**
+   * Whether HR have signed this rating off, by adjusting it or approving it as set (P-4.8).
+   *
+   * **Null where the caller has no grounds to know.** Whether HR were through a rating is part
+   * of the calibration trail, and `READ_RATING_AUDIT` has no `SELF` ground (P-4.7), so the
+   * subject reading their own released rating gets no field at all. Null is not false.
+   */
+  signedOffByHr: boolean | null
   rating: Rating
   setAt: string
   releasedAt: string | null
@@ -221,6 +246,14 @@ export interface Calibration {
 
 export type GoalStatus = 'OPEN' | 'COMPLETE'
 
+/**
+ * Where a development goal stands between the manager who wrote it and the employee it is for
+ * (P-5.9). Null on an improvement goal, which is put to the employee rather than agreed.
+ *
+ * DRAFT never reaches the employee: the server does not return drafts to them at all.
+ */
+export type GoalAgreement = 'DRAFT' | 'PENDING' | 'AGREED'
+
 export interface Goal {
   id: number
   title: string
@@ -229,6 +262,11 @@ export interface Goal {
   status: GoalStatus
   completedAt: string | null
   approvedBy: string | null
+  agreement: GoalAgreement | null
+  submittedAt: string | null
+  agreedAt: string | null
+  /** The employee's own words, kept apart from `detail`, which is the manager's. */
+  progressNote: string | null
 }
 
 export type PlanStatus = 'ACTIVE' | 'SUSPENDED'

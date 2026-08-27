@@ -3,7 +3,8 @@ import { CycleSelect, useSelectedCycle } from '../../components/CycleSelect'
 import { useMyReviewRecord } from '../../api/reviews'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { Card, Fact, when } from '../../components/Form'
-import { Loading, QueryFailure } from '../../components/States'
+import { Loading, NotUnderReview, QueryFailure } from '../../components/States'
+import { isNotFound } from '../../api/errors'
 import type { OwnReviewRecord, Section } from '../../api/types'
 import { RATING_LABELS } from '../../api/types'
 
@@ -34,10 +35,12 @@ export function MyReviews() {
 
       {cycleId === undefined ? null : isPending ? (
         <Loading />
+      ) : isNotFound(error) ? (
+        // Not a participant in this cycle. The access decision passed - this is the caller's
+        // own record - and it is the record that is absent, so this is an ordinary state and
+        // not a denial. It used to render as a failed request.
+        <NotUnderReview />
       ) : error ? (
-        // A 403 here is the ordinary case for somebody not under review this cycle: they are
-        // not a participant, so there is no record of theirs to read. The denial screen is
-        // the right answer, and it is the same one everywhere.
         <QueryFailure error={error} />
       ) : (
         <Record record={record} />
@@ -71,7 +74,7 @@ function Record({ record }: { record: OwnReviewRecord }) {
         ) : (
           <p className="text-sm text-muted">
             You have not written your self-review yet.{' '}
-            <Link className="text-accent" to="/my/self-review">
+            <Link className="text-accent underline" to="/my/self-review">
               Write it now
             </Link>
             .

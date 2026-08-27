@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +25,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -144,5 +146,48 @@ class UserListingOutsideTransactionTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].fullName").value("Lazy Report"))
                 .andExpect(jsonPath("$[0].managerName").value("Lazy Admin"));
+    }
+
+    // ---------------------------------------------------------------- the writes
+    //
+    // The reads above were covered; the writes were not, and they are the riskier half. Each
+    // one loads a user, changes a field and returns it, without ever touching the roles
+    // collection inside the transaction - so the collection is still uninitialised when
+    // UserView reads it afterwards. Every one of these returned 500 before the mapper was
+    // pushed into the service.
+
+    @Test
+    @DisplayName("deactivating returns a view that resolves outside the transaction")
+    void deactivateResolvesLazyAssociations() throws Exception {
+        mvc.perform(put(USERS + "/" + reportId + "/deactivate").header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.active").value(false))
+                .andExpect(jsonPath("$.user.roles[0]").value("EMPLOYEE"))
+                .andExpect(jsonPath("$.user.departmentName").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("reactivating does too")
+    void reactivateResolvesLazyAssociations() throws Exception {
+        mvc.perform(put(USERS + "/" + reportId + "/deactivate").header("Authorization", bearer()))
+                .andExpect(status().isOk());
+
+        mvc.perform(put(USERS + "/" + reportId + "/reactivate").header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.roles[0]").value("EMPLOYEE"));
+    }
+
+    @Test
+    @DisplayName("reassigning a reporting line does too")
+    void setManagerResolvesLazyAssociations() throws Exception {
+        mvc.perform(put(USERS + "/" + reportId + "/manager")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"managerId\":null}")
+                        .header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managerName").doesNotExist())
+                .andExpect(jsonPath("$.roles[0]").value("EMPLOYEE"))
+                .andExpect(jsonPath("$.departmentName").isNotEmpty());
     }
 }

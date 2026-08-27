@@ -51,17 +51,32 @@ public class DevelopmentPlanController {
     public record GoalEditRequest(@NotBlank String title, String detail) {
     }
 
+    /** Progress is free text and may be cleared, so nothing here is required. */
+    public record ProgressRequest(String note) {
+    }
+
     public record TargetDateRequest(LocalDate targetDate) {
     }
 
+    /**
+     * @param agreement    DRAFT, PENDING or AGREED (P-5.9). Drives what the client offers, and
+     *                     never reaches the employee as DRAFT, because those are not returned
+     *                     to them at all.
+     * @param progressNote how the goal is going, in the employee's own words, kept apart from
+     *                     {@code detail} so that reporting progress cannot restate the goal
+     */
     public record GoalView(Long id, String title, String detail, LocalDate targetDate,
-                           String status, Instant completedAt, String approvedBy) {
+                           String status, Instant completedAt, String approvedBy,
+                           String agreement, Instant submittedAt, Instant agreedAt,
+                           String progressNote) {
 
         static GoalView of(PlanGoal goal) {
             return new GoalView(
                     goal.getId(), goal.getTitle(), goal.getDetail(), goal.getTargetDate(),
                     goal.getStatus().name(), goal.getCompletedAt(),
-                    goal.getApprovedBy() == null ? null : goal.getApprovedBy().getFullName());
+                    goal.getApprovedBy() == null ? null : goal.getApprovedBy().getFullName(),
+                    goal.getAgreement() == null ? null : goal.getAgreement().name(),
+                    goal.getSubmittedAt(), goal.getAgreedAt(), goal.getProgressNote());
         }
     }
 
@@ -78,8 +93,8 @@ public class DevelopmentPlanController {
          * <p>Undated goals sort last: a goal with no date yet is one still being agreed, and it
          * belongs after the ones that have been.
          */
-        static PlanView of(DevelopmentPlan plan) {
-            List<GoalView> goals = plan.getGoals().stream()
+        static PlanView of(DevelopmentPlan plan, List<PlanGoal> visibleGoals) {
+            List<GoalView> goals = visibleGoals.stream()
                     .sorted(Comparator
                             .comparing(PlanGoal::getTargetDate,
                                     Comparator.nullsLast(Comparator.naturalOrder()))
@@ -128,11 +143,49 @@ public class DevelopmentPlanController {
                 userId, request.title(), request.detail(), request.targetDate(), GoalView::of);
     }
 
-    /** Text only. The date moves through its own endpoint, under its own capability. */
+    /** Text only, and only while the goal is still a draft. The manager's (P-5.9). */
     @PutMapping("/goals/{goalId}")
-    @Operation(summary = "Edit a goal's text; the employee's route for reporting progress")
+    @Operation(summary = "Reword a goal; refused once the employee has agreed to it (P-5.9)")
     public GoalView editGoal(@PathVariable Long goalId, @Valid @RequestBody GoalEditRequest request) {
         return plans.editGoal(goalId, request.title(), request.detail(), GoalView::of);
+    }
+
+    /**
+     * Submits a drafted goal to the employee (P-5.9).
+     *
+     * <p>Until this, the goal is not on their plan at all - not shown as pending, not counted,
+     * simply not returned to them. Submitting is what puts it in front of them to accept.
+     */
+    @PostMapping("/goals/{goalId}/submission")
+    @Operation(summary = "Submit a drafted goal to the employee for agreement (P-5.9)")
+    public GoalView submitGoal(@PathVariable Long goalId) {
+        return plans.submitGoal(goalId, GoalView::of);
+    }
+
+    /**
+     * The employee agreeing to a submitted goal (P-5.9).
+     *
+     * <p>Takes no user id, so the API cannot express agreeing on somebody else's behalf - the
+     * same shape as the self-review, and for the same reason. {@code AGREE_DEVELOPMENT_GOAL}
+     * carries {@code SELF} alone, so the manager who wrote the goal cannot agree to it either.
+     */
+    @PostMapping("/goals/{goalId}/agreement")
+    @Operation(summary = "Agree to a goal your manager submitted; the employee's alone (P-5.9)")
+    public GoalView agreeGoal(@PathVariable Long goalId) {
+        return plans.agreeGoal(goalId, GoalView::of);
+    }
+
+    /**
+     * Recording how an agreed goal is going (P-5.9).
+     *
+     * <p>Writes a field of its own and never the goal's wording, so progress cannot restate the
+     * goal that was agreed. The employee or their manager.
+     */
+    @PutMapping("/goals/{goalId}/progress")
+    @Operation(summary = "Record progress on an agreed goal, without touching its wording")
+    public GoalView reportProgress(@PathVariable Long goalId,
+                                   @RequestBody ProgressRequest request) {
+        return plans.reportProgress(goalId, request.note(), GoalView::of);
     }
 
     /**

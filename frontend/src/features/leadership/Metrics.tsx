@@ -35,11 +35,7 @@ export function Metrics() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-semibold tracking-tight">Performance across Altrium</h1>
-      <p className="mb-4 text-sm text-muted">
-        Totals for the organisation. Individual reviews, ratings and plans are not shown to
-        Leadership, and there is no way to open one from here.
-      </p>
+      <h1 className="mb-4 text-xl font-semibold tracking-tight">Performance across Altrium</h1>
       <CycleSelect cycles={cycles} cycleId={cycleId} onChange={setCycleId} />
 
       {cycleId === undefined ? null : isPending ? (
@@ -116,30 +112,24 @@ function Distribution({ distribution }: { distribution: Record<string, number> }
       {rated === 0 ? (
         <p className="text-sm text-muted">No ratings have been set in this cycle yet.</p>
       ) : (
-        <>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bars} barCategoryGap="28%" margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.008 80)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
-                <Tooltip
-                  cursor={{ fill: 'oklch(0.95 0.006 80)' }}
-                  formatter={(value) => [`${Number(value)} people`, 'Rated'] as [string, string]}
-                />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                  {bars.map((bar) => (
-                    <Cell key={bar.rating} fill={RATING_COLOURS[bar.rating]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            {rated} rating{rated === 1 ? '' : 's'} set across the organisation. This is not
-            broken down by department: in a small one, the breakdown would identify people.
-          </p>
-        </>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={bars} barCategoryGap="28%" margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.008 80)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
+              <Tooltip
+                cursor={{ fill: 'oklch(0.95 0.006 80)' }}
+                formatter={(value) => [`${Number(value)} people`, 'Rated'] as [string, string]}
+              />
+              <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                {bars.map((bar) => (
+                  <Cell key={bar.rating} fill={RATING_COLOURS[bar.rating]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </Card>
   )

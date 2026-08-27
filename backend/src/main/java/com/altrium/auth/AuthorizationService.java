@@ -349,6 +349,16 @@ public class AuthorizationService {
                 return AuthorizationDecision.deny("P-4.4",
                         "final rating has not been released to the subject");
             }
+            if (capability == Capability.READ_MANAGER_REVIEW && !state.released()) {
+                // P-4.4 again, and it has to be the same gate rather than a similar one. The
+                // feedback is the assessment in words; releasing the number is what makes the
+                // outcome the subject's to know. Handing over "you have not grown into the role
+                // this year" while withholding the rating tells them the outcome without
+                // telling them the outcome, and does it before anybody meant to have the
+                // conversation.
+                return AuthorizationDecision.deny("P-4.4",
+                        "manager feedback travels with the rating and has not been released");
+            }
         }
         return AuthorizationDecision.permit(grounds, capability.policy());
     }

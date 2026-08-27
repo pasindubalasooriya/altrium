@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
+import { ApiError } from './errors'
 import type { DevelopmentPlan, Goal, ImprovementPlan, OwnImprovementPlan } from './types'
 
 /**
@@ -42,8 +43,57 @@ export interface GoalInput {
 export function useAddGoal(userId: number | undefined, planKey: unknown[]) {
   const queries = useQueryClient()
   return useMutation({
-    mutationFn: (goal: GoalInput) =>
-      api.post<Goal>(`/api/plans/development/${userId}/goals`, goal),
+    mutationFn: (goal: GoalInput) => {
+      // Guarded, because the id comes from a separate query and an undefined one used to be
+      // interpolated straight into the path - producing a POST to `.../undefined/goals` that
+      // the server could only reject, on a screen whose own data had loaded perfectly well.
+      // Whoever it happened to saw "add goal" simply not work, with nothing to explain it.
+      if (userId === undefined) {
+        return Promise.reject(
+          new ApiError(0, 'Still working out who you are. Try that again in a moment.'),
+        )
+      }
+      return api.post<Goal>(`/api/plans/development/${userId}/goals`, goal)
+    },
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: planKey })
+    },
+  })
+}
+
+/** The manager putting a drafted goal in front of the employee (P-5.9). */
+export function useSubmitGoal(planKey: unknown[]) {
+  const queries = useQueryClient()
+  return useMutation({
+    mutationFn: (goalId: number) =>
+      api.post<Goal>(`/api/plans/development/goals/${goalId}/submission`),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: planKey })
+    },
+  })
+}
+
+/**
+ * The employee accepting a goal. Takes no user id, so the request cannot be pointed at
+ * somebody else - the same shape as the self-review, and for the same reason.
+ */
+export function useAgreeGoal(planKey: unknown[]) {
+  const queries = useQueryClient()
+  return useMutation({
+    mutationFn: (goalId: number) =>
+      api.post<Goal>(`/api/plans/development/goals/${goalId}/agreement`),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: planKey })
+    },
+  })
+}
+
+/** Progress, written to its own field so it can never restate the goal that was agreed. */
+export function useReportProgress(planKey: unknown[]) {
+  const queries = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, note }: { goalId: number; note: string }) =>
+      api.put<Goal>(`/api/plans/development/goals/${goalId}/progress`, { note }),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: planKey })
     },

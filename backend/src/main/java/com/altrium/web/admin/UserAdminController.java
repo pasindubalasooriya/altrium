@@ -96,29 +96,31 @@ public class UserAdminController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserView create(@Valid @RequestBody CreateUserRequest request) {
-        return UserView.of(org.createUser(
+        return org.createUser(
                 request.asgardeoSubject(),
                 request.email(),
                 request.fullName(),
                 request.departmentId(),
                 request.managerId(),
-                request.roles() == null ? java.util.Set.<Role>of() : request.roles()));
+                request.roles() == null ? java.util.Set.<Role>of() : request.roles(),
+                UserView::of);
     }
 
     @PutMapping("/{id}")
     public UserView update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
-        return UserView.of(org.updateUser(
+        return org.updateUser(
                 id,
                 request.email(),
                 request.fullName(),
                 request.departmentId(),
-                request.roles() == null ? java.util.Set.<Role>of() : request.roles()));
+                request.roles() == null ? java.util.Set.<Role>of() : request.roles(),
+                UserView::of);
     }
 
     @PutMapping("/{id}/manager")
     @Operation(summary = "Set or clear a reporting line; rejects loops (P-1.4)")
     public UserView setManager(@PathVariable Long id, @RequestBody SetManagerRequest request) {
-        return UserView.of(org.setManager(id, request.managerId()));
+        return org.setManager(id, request.managerId(), UserView::of);
     }
 
     /**
@@ -127,15 +129,18 @@ public class UserAdminController {
      */
     @PutMapping("/{id}/deactivate")
     public DeactivationView deactivate(@PathVariable Long id) {
-        OrgService.DeactivationResult result = org.deactivate(id);
-        String warning = result.danglingReports() == 0
-                ? null
-                : result.danglingReports() + " user(s) still report to this person and need reassigning";
-        return new DeactivationView(UserView.of(result.user()), result.danglingReports(), warning);
+        // Assembled inside the service transaction: UserView reads the department, manager
+        // and roles, none of which this write touches, so all three are still lazy out here.
+        return org.deactivate(id, result -> {
+            String warning = result.danglingReports() == 0
+                    ? null
+                    : result.danglingReports() + " user(s) still report to this person and need reassigning";
+            return new DeactivationView(UserView.of(result.user()), result.danglingReports(), warning);
+        });
     }
 
     @PutMapping("/{id}/reactivate")
     public UserView reactivate(@PathVariable Long id) {
-        return UserView.of(org.reactivate(id));
+        return org.reactivate(id, UserView::of);
     }
 }

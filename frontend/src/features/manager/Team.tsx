@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom'
 import { CycleSelect, useSelectedCycle } from '../../components/CycleSelect'
 import { usePermittedReviews } from '../../api/reviews'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { Pager, usePaging } from '../../components/Pager'
 import { EmptyState, Loading, QueryFailure } from '../../components/States'
+import { managerIsWaitedOn } from './waiting'
+import { RowLink } from '../../components/RowLink'
 
 /**
  * The manager's team for a cycle.
@@ -69,15 +70,22 @@ export function Team() {
                   </td>
                   <td className="p-3 text-muted">{review.departmentName ?? '-'}</td>
                   <td className="p-3 text-right">
-                    <Link
-                      className="text-accent"
+                    {/*
+                      Peer feedback that has arrived unread, or a rating HR have handed back.
+                      Both are the server's facts; only the first remembers anything locally.
+
+                      Only on rows this caller manages. An HR user sees their granted
+                      departments in this table too, and neither prompt is theirs to clear on
+                      somebody else's report.
+                    */}
+                    <RowLink
                       to={`/manager/reviews/${review.subjectId}?cycleId=${cycleId}`}
+                      dot={managerIsWaitedOn(cycleId, review, me?.id) !== null}
+                      dotLabel={managerIsWaitedOn(cycleId, review, me?.id) ?? undefined}
                     >
                       Open review
-                    </Link>
-                    <Link className="ml-4 text-accent" to={`/manager/plans/${review.subjectId}`}>
-                      Plan
-                    </Link>
+                    </RowLink>
+                    <RowLink to={`/manager/plans/${review.subjectId}`}>Open plan</RowLink>
                   </td>
                 </tr>
               ))}

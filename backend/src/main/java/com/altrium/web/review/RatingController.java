@@ -109,6 +109,29 @@ public class RatingController {
                 cycleId, subjectId, request.rating(), request.note(), CalibrationView::of);
     }
 
+    /**
+     * HR sign the rating off unchanged, which is what lets the manager share it (P-4.8).
+     *
+     * <p>A separate endpoint from calibration rather than a flag on it, so the two acts read
+     * differently in the log and in the audit trail: "HR moved this" and "HR agreed with this"
+     * are different things to have happened, even though both unlock the same release.
+     *
+     * <p>Same 403s as calibration, by the same route - an HR user approving their own rating is
+     * refused by the evaluation order, not by a check here.
+     */
+    @PostMapping("/{subjectId}/rating/approval")
+    @Operation(summary = "Approve a rating as set, signing it off for release (P-4.8)")
+    public CalibrationView approve(@PathVariable Long subjectId,
+                                   @RequestParam Long cycleId,
+                                   @RequestBody(required = false) ApprovalRequest request) {
+        return ratings.approve(
+                cycleId, subjectId, request == null ? null : request.note(), CalibrationView::of);
+    }
+
+    /** An optional note, for the same reason calibration carries one. */
+    public record ApprovalRequest(String note) {
+    }
+
     /** The trail. Readable by the manager and HR-in-scope, and never by the subject. */
     @GetMapping("/{subjectId}/rating/calibration")
     @Operation(summary = "The calibration history for a rating; no SELF grounds exist for it")

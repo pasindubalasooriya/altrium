@@ -169,4 +169,54 @@ class PeerCandidateTest {
                 .andExpect(content().string(not(containsString("managerId"))))
                 .andExpect(content().string(not(containsString("rating"))));
     }
+
+    @Test
+    @DisplayName("P-3.12: an HR user is offered as a peer only inside their own department")
+    void P_3_12_hrIsACandidateOnlyWithinTheirOwnDepartment() throws Exception {
+        Department engineering = org.department("Engineering-hr");
+        Department people = org.department("People-hr");
+        AppUser elena = org.userIn(engineering, "elena-hr", Role.EMPLOYEE, Role.MANAGER);
+        AppUser aisha = org.userIn(engineering, "aisha-hr", Role.EMPLOYEE);
+        AppUser samuel = org.userIn(people, "samuel-hr", Role.EMPLOYEE);
+        AppUser kevin = org.userIn(people, "kevin-hr", Role.EMPLOYEE, Role.HR);
+        aisha.setManager(elena);
+        samuel.setManager(elena);
+        org.flush();
+
+        // Kevin is in People. Reviewing Aisha in Engineering would have him writing input to a
+        // rating HR then calibrates, and reading his own peer review back while doing it.
+        mvc.perform(get(candidates(aisha.getId()))
+                        .header("Authorization", "Bearer " + OrgFixture.tokenFor("elena-hr")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(kevin.getFullName()))));
+
+        // Inside HR they can and they should: Samuel sits in People alongside him, and a
+        // colleague who works with somebody every day is exactly whom peer feedback is for.
+        mvc.perform(get(candidates(samuel.getId()))
+                        .header("Authorization", "Bearer " + OrgFixture.tokenFor("elena-hr")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(kevin.getFullName())));
+    }
+
+    @Test
+    @DisplayName("P-3.13: Leadership are not peer reviewers, and are not offered as candidates")
+    void P_3_13_leadershipDoNotWritePeerFeedback() throws Exception {
+        Department engineering = org.department("Engineering-lead");
+        AppUser richard = org.user("richard-lead", Role.EMPLOYEE, Role.LEADERSHIP);
+        AppUser elena = org.userIn(engineering, "elena-lead", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-lead", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha-lead", Role.EMPLOYEE);
+        elena.setManager(richard);
+        john.setManager(elena);
+        org.flush();
+
+        // Not offered. Leadership sit a tier or two above the people being reviewed, so a
+        // remark from them is not what section 5 means by a colleague's view.
+        mvc.perform(get(candidates(john.getId()))
+                        .header("Authorization", "Bearer " + OrgFixture.tokenFor("elena-lead")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(richard.getFullName()))))
+                // And the exclusion has not swallowed the ordinary colleague beside him.
+                .andExpect(content().string(containsString(aisha.getFullName())));
+    }
 }

@@ -13,13 +13,17 @@ Built through `OrgService`, not raw SQL, so the seed exercises the same loop rej
 
 ## Who can actually log in
 
-Five people have real Asgardeo accounts. Everyone else carries a synthetic subject and exists only to give the hierarchy shape - nothing below the login screen can tell the difference. Passwords are in `users.md`, outside the repo.
+Seven people have real Asgardeo accounts. Everyone else carries a synthetic subject and exists only to give the hierarchy shape - nothing below the login screen can tell the difference. Passwords are in `users.md`, outside the repo.
+
+Identity is matched on the Asgardeo **subject**, never on the email address, so adding somebody takes two steps and not one. An account created in the console alone authenticates perfectly and then meets "your account is not set up in Altrium" - the token is valid and names nobody this system knows. The subject has to be recorded against their row as well, in `SeedData` for a fresh database and by hand for one that has already been seeded.
 
 | Person | Email | Role | Sits |
 |---|---|---|---|
 | Richard Hale | `richard@altrium.test` | LEADERSHIP | above all departments |
 | Jane Okafor | `jane@altrium.test` | MANAGER | Engineering, reports to Elena |
 | John Alvarez | `john@altrium.test` | EMPLOYEE | Engineering, reports to Jane |
+| Aisha Khan | `aisha@altrium.test` | EMPLOYEE | Engineering, reports to Jane |
+| Diego Santos | `diego@altrium.test` | EMPLOYEE | Engineering, reports to Jane |
 | Kevin Doyle | `kevin@altrium.test` | HR + MANAGER (**HR Head**) | People Operations, reports to Richard |
 | Devin Marsh | `devin@altrium.test` | SUPER_ADMIN + EMPLOYEE | No department, no manager - a dedicated platform account (P-9.5) |
 

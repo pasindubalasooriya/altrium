@@ -386,4 +386,110 @@ class PermittedReviewReadTest {
         mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString()))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @DisplayName("visibleSections names grounds, not content: an empty section the manager may read is still named")
+    void visibleSectionsNameGroundsRatherThanContent() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.flush();
+
+        // Nothing has been written for John at all. Elena may read every section of his record
+        // regardless, and the response has to say so - otherwise her screen tells her she has
+        // no access to her own report's self-review, which is both false and alarming.
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.selfReview").doesNotExist())
+                .andExpect(jsonPath("$.peerReviews").doesNotExist())
+                .andExpect(jsonPath("$.visibleSections").value(hasItem("SELF_REVIEW")))
+                .andExpect(jsonPath("$.visibleSections").value(hasItem("MANAGER_REVIEW")))
+                .andExpect(jsonPath("$.visibleSections").value(hasItem("PEER_REVIEWS")));
+
+        // John's own record of the same empty cycle. The peer section is not named, because he
+        // has no grounds for it - and that is a statement about him, not about whether anyone
+        // has written. There is still no count and no content to read either way (P-3.3).
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visibleSections").value(hasItem("SELF_REVIEW")))
+                .andExpect(jsonPath("$.visibleSections").value(not(hasItem("PEER_REVIEWS"))));
+    }
+
+    @Test
+    @DisplayName("P-4.4: the rating section is the exception - it is named only when one arrives")
+    void theRatingSectionStaysTiedToWhatArrived() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.unreleasedRating(cycle, john, elena, Rating.MEETS_EXPECTATIONS);
+        reviews.flush();
+
+        // A rating exists and has not been released. If grounds were reported here, John would
+        // be told he may see a rating and that none is there - which separates "not rated yet"
+        // from "rated, not shared". Release exists precisely to control that difference.
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating").doesNotExist())
+                .andExpect(jsonPath("$.visibleSections").value(not(hasItem("FINAL_RATING"))));
+    }
+
+    @Test
+    @DisplayName("P-3.3: the peer count on the review list reaches the manager and never the subject")
+    void P_3_3_peerCountIsWithheldFromTheSubjectOnTheList() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha", Role.EMPLOYEE);
+        john.setManager(elena);
+        elena.setManager(org.user("priya", Role.EMPLOYEE, Role.LEADERSHIP));
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.participant(cycle, elena);
+        reviews.peerReview(cycle, john, aisha, "great to pair with");
+        // A peer review about Elena herself, so her own row would carry a count of 1 if the
+        // scoping were wrong. Without this the last assertion below would pass on an empty
+        // table and prove nothing.
+        reviews.peerReview(cycle, elena, aisha, "clear about priorities");
+        reviews.flush();
+
+        // The page is sorted by name, so Elena's own row is first and John's is second. Asserted
+        // by index rather than by a JSONPath filter, because a filter reports a missing property
+        // as [null] and would pass whether the field was omitted or present and empty.
+        mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[1].subjectId").value(john.getId()))
+                // Elena is told about John, because she is the one who has to notice it arrived.
+                .andExpect(jsonPath("$.content[1].peerReviewsSubmitted").value(1))
+                .andExpect(jsonPath("$.content[0].subjectId").value(elena.getId()))
+                // And her own row is withheld from her on that very same page. Being a manager
+                // somewhere does not make her a manager of herself, and there is a peer review
+                // about her in the table to prove the assertion is not passing on an empty one.
+                .andExpect(jsonPath("$.content[0].peerReviewsSubmitted").doesNotExist());
+
+        // John's own row is on this same page - the summary admits SELF - and it carries no
+        // count at all. Not zero: a zero is the count, and one bit at a time is still a leak.
+        mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].subjectId").value(john.getId()))
+                .andExpect(jsonPath("$.content[0].peerReviewsSubmitted").doesNotExist());
+
+    }
 }

@@ -75,12 +75,6 @@ export function HrGrants() {
                 </Select>
               </Field>
             </div>
-            {hrUser && (
-              <p className="mt-3 text-sm text-muted">
-                {hrUser.fullName} is in {hrUser.departmentName ?? 'no department'}. Without an
-                explicit grant over that department, they cannot act on reviews inside it.
-              </p>
-            )}
           </Card>
 
           {hrUser && (
@@ -143,11 +137,6 @@ export function HrGrants() {
                 )}
 
                 <WriteFailure error={actions.setExplicit.error ?? actions.revoke.error} />
-
-                <p className="mt-3 text-xs text-muted">
-                  A revoked grant applies on {hrUser.fullName}’s very next request. They do not
-                  need to sign out.
-                </p>
               </Card>
 
               <Card title="Grant a department">
@@ -192,24 +181,6 @@ export function HrGrants() {
                 </div>
 
                 <WriteFailure error={actions.grant.error} />
-
-                <div className="mt-4 rounded bg-line/30 p-3 text-sm">
-                  <p className="font-medium">What the explicit grant does</p>
-                  <p className="mt-1 text-muted">
-                    It lets this HR user act inside their <em>own</em> department, which they
-                    otherwise cannot. This is the HR Head mechanism, and it is a property of
-                    this one grant rather than a role.
-                  </p>
-                  <p className="mt-2 text-muted">
-                    {/*
-                      Stated at the moment the flag is set, which is the only moment somebody
-                      would think otherwise. P-2.2 has no override, and this is the screen where
-                      an administrator might expect one.
-                    */}
-                    It does <strong>not</strong> let them reach their own review, rating or
-                    plan. Nothing does.
-                  </p>
-                </div>
               </Card>
             </>
           )}

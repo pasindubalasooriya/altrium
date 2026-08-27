@@ -333,4 +333,50 @@ public class OrgService {
      */
     public record DeactivationResult(AppUser user, long danglingReports) {
     }
+
+    // ---------------------------------------------------------------- mapping inside the transaction
+    //
+    // Each write above returns an entity, which is what internal callers and tests want. A
+    // controller wants a DTO, and building one reads associations that are still lazy when the
+    // service returns: the department and manager of a user loaded by id, and the roles
+    // collection, which none of these methods touches on its way through.
+    //
+    // Converting in the controller therefore threw LazyInitializationException on a closed
+    // session - a 500, not a denial - while every test passed, because tests hold a session open
+    // for their whole run. These overloads apply the mapper here instead, where the transaction
+    // is still open. UserListingOutsideTransactionTest is what proves it, by running without one.
+    //
+    // The entity-returning versions are kept rather than replaced, in the same way
+    // directReports keeps both: a caller already inside a transaction has no need of this.
+
+    public <T> T createUser(String asgardeoSubject, String email, String fullName,
+                            Long departmentId, Long managerId, Set<Role> roles,
+                            Function<AppUser, T> mapper) {
+        return mapper.apply(createUser(asgardeoSubject, email, fullName, departmentId, managerId, roles));
+    }
+
+    public <T> T updateUser(Long id, String email, String fullName, Long departmentId,
+                            Set<Role> roles, Function<AppUser, T> mapper) {
+        return mapper.apply(updateUser(id, email, fullName, departmentId, roles));
+    }
+
+    public <T> T setManager(Long userId, Long managerId, Function<AppUser, T> mapper) {
+        return mapper.apply(setManager(userId, managerId));
+    }
+
+    public <T> T reactivate(Long userId, Function<AppUser, T> mapper) {
+        return mapper.apply(reactivate(userId));
+    }
+
+    public <T> T deactivate(Long userId, Function<DeactivationResult, T> mapper) {
+        return mapper.apply(deactivate(userId));
+    }
+
+    public <T> T createDepartment(String name, Function<Department, T> mapper) {
+        return mapper.apply(createDepartment(name));
+    }
+
+    public <T> T renameDepartment(Long id, String name, Function<Department, T> mapper) {
+        return mapper.apply(renameDepartment(id, name));
+    }
 }

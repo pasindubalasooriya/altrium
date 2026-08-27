@@ -141,18 +141,65 @@ class PeerFeedbackGateTest {
     }
 
     @Test
-    @DisplayName("drafting is untouched - only the irreversible act waits")
-    void draftingIsNotGated() throws Exception {
+    @DisplayName("drafting waits too - the manager cannot write a word before both peers have")
+    void draftingIsGatedAsWell() throws Exception {
         Scene s = scene("draft");
 
-        // No peer has written a word, and the manager can still save their working text. The
-        // gate on the submit branch alone is what makes the deviation tolerable: the manager is
-        // not locked out of the form, only out of finishing it.
+        // The stronger reading, by Product Owner ruling. A draft written before the peer
+        // feedback arrives and submitted after it satisfies the timing while defeating the
+        // purpose, because the manager's words are already on the page.
         mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/manager-review")
                         .param("cycleId", s.cycle().getId().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"feedback\":\"Notes so far\"}")
                         .header("Authorization", bearer("elena-draft")))
+                .andExpect(status().isConflict());
+
+        // 409 and not 403 throughout: she holds WRITE_MANAGER_REVIEW the whole time, and a
+        // denial would tell her she has no business reviewing her own report.
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/manager-review")
+                        .param("cycleId", s.cycle().getId().toString()).param("submit", "true")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(feedback("Strong year"))
+                        .header("Authorization", bearer("elena-draft")))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("a blocked draft leaves no manager review row behind")
+    void aBlockedDraftWritesNothing() throws Exception {
+        Scene s = scene("norow");
+
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/manager-review")
+                        .param("cycleId", s.cycle().getId().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"feedback\":\"Notes so far\"}")
+                        .header("Authorization", bearer("elena-norow")))
+                .andExpect(status().isConflict());
+
+        // The row used to be created before the gate was reached. An empty review sitting in
+        // the table would be counted as started by the cycle monitoring, so a refused write
+        // would have moved a completion figure.
+        mvc.perform(get(REVIEWS + "/" + s.subject().getId())
+                        .param("cycleId", s.cycle().getId().toString())
+                        .header("Authorization", bearer("elena-norow")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managerReview").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("once both peers have submitted, the manager may draft as well as submit")
+    void draftingOpensWithTheGate() throws Exception {
+        Scene s = scene("open");
+        reviews.peerReview(s.cycle(), s.subject(), s.peerA(), "Reliable");
+        reviews.peerReview(s.cycle(), s.subject(), s.peerB(), "Collaborative");
+        reviews.flush();
+
+        mvc.perform(put(REVIEWS + "/" + s.subject().getId() + "/manager-review")
+                        .param("cycleId", s.cycle().getId().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"feedback\":\"Notes so far\"}")
+                        .header("Authorization", bearer("elena-open")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submitted").value(false));
     }

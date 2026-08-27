@@ -92,10 +92,6 @@ export function CycleMonitoring() {
               </table>
             </div>
           )}
-
-          <p className="text-xs text-muted">
-            These counts cover the departments you hold grants for, and never your own review.
-          </p>
         </div>
       )}
     </>

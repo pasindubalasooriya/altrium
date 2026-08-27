@@ -14,6 +14,10 @@ import { Loading } from '../components/States'
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { state, signIn } = useAuthContext()
 
+  // Three facts get confused with one another here. `isAuthenticated` is restored from
+  // storage and says nothing about whether the access token still works, which is why a
+  // refresh can sail through this gate and then fail on the first request - the token provider
+  // is installed during render rather than from an effect for exactly that reason.
   if (state.isLoading) {
     return <Loading what="Checking your session" />
   }

@@ -22,11 +22,7 @@ export function PeerTasks() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-semibold tracking-tight">Peer reviews to write</h1>
-      <p className="mb-4 text-sm text-muted">
-        Your feedback is anonymous. The person you are reviewing never sees who wrote it, or how
-        many people were asked.
-      </p>
+      <h1 className="mb-4 text-xl font-semibold tracking-tight">Peer reviews to write</h1>
       <CycleSelect cycles={cycles} cycleId={cycleId} onChange={setCycleId} />
 
       {cycleId === undefined ? null : isPending ? (

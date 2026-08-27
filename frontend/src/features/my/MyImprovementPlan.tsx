@@ -71,9 +71,7 @@ function PlanDetail({ plan }: { plan: ImprovementPlan }) {
                 <div className="flex flex-wrap items-baseline gap-x-3">
                   <span className="font-medium">{goal.title}</span>
                   <span className="text-xs text-muted">
-                    {goal.status === 'COMPLETE'
-                      ? `approved${goal.approvedBy ? ` by ${goal.approvedBy}` : ''}`
-                      : 'open'}
+                    {goal.status === 'COMPLETE' ? 'approved as completed' : 'open'}
                   </span>
                   <span className="ml-auto text-xs text-muted">
                     {goal.targetDate ? `due ${when(goal.targetDate)}` : ''}

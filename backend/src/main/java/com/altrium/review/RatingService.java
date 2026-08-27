@@ -9,6 +9,7 @@ import com.altrium.config.ConflictApiException;
 import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
 import com.altrium.org.AppUserRepository;
+import com.altrium.org.HrDepartmentGrantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,7 @@ public class RatingService {
     private final RatingCalibrationRepository calibrations;
     private final ManagerReviewRepository managerReviews;
     private final PeerFeedbackGate peerFeedbackGate;
+    private final HrDepartmentGrantRepository hrGrants;
 
     public RatingService(AuthorizationService authorization,
                          CurrentUserService currentUser,
@@ -60,7 +62,8 @@ public class RatingService {
                          FinalRatingRepository ratings,
                          RatingCalibrationRepository calibrations,
                          ManagerReviewRepository managerReviews,
-                         PeerFeedbackGate peerFeedbackGate) {
+                         PeerFeedbackGate peerFeedbackGate,
+                         HrDepartmentGrantRepository hrGrants) {
         this.authorization = authorization;
         this.currentUser = currentUser;
         this.users = users;
@@ -70,6 +73,7 @@ public class RatingService {
         this.calibrations = calibrations;
         this.managerReviews = managerReviews;
         this.peerFeedbackGate = peerFeedbackGate;
+        this.hrGrants = hrGrants;
     }
 
     // ================================================================= feature 12: the manager chooses
@@ -166,11 +170,12 @@ public class RatingService {
 
         Rating before = rating.getRating();
         if (before == adjustedTo) {
-            // An audit row saying nothing changed would dilute a table whose every row is
-            // supposed to mean "somebody moved this". HR agreeing with the manager is the
-            // normal case and needs no record.
+            // Still refused here, but no longer because agreement needs no record - under P-4.8
+            // it very much does, since agreement is what unlocks the manager's release. It is a
+            // separate act with its own endpoint, so the trail says which of the two happened
+            // rather than leaving it to be inferred from two equal values.
             throw new ValidationApiException(
-                    "That is already the rating; calibration records changes, not confirmations");
+                    "That is already the rating. To sign it off unchanged, approve it instead");
         }
 
         rating.setRating(adjustedTo);
@@ -181,6 +186,53 @@ public class RatingService {
         // Appended in the same transaction as the change, so no rating can move without the
         // row that explains it, and no explanation can survive a change that rolled back.
         return mapper.apply(calibrations.save(audit));
+    }
+
+    /**
+     * HR signs a rating off unchanged (P-4.8).
+     *
+     * <p>The counterpart of {@link #calibrate}: the same authority, exercised the other way. It
+     * carries {@code CALIBRATE_RATING} rather than a capability of its own, because approving a
+     * rating and adjusting one are the same act of HR judgement over the same record - and
+     * because a second capability would be a second place for P-2.2 to be got wrong. An HR user
+     * cannot sign off their own rating, and the ordering refuses it without this method saying
+     * so.
+     *
+     * <p>Recorded as a calibration row whose before and after are equal. That is not a
+     * workaround: the table's purpose is to say who touched this rating and when, and an
+     * approval is exactly that. It also means the release gate has one question to ask - is
+     * there a row - rather than two states to keep in step.
+     */
+    public <T> T approve(Long cycleId, Long subjectId, String note,
+                         Function<RatingCalibration, T> mapper) {
+
+        ReviewSubject subject = authorization.subject(subjectId);
+        authorization.require(Capability.CALIBRATE_RATING, subject);
+
+        requireOpenCycle(cycleId);
+        FinalRating rating = requireRating(cycleId, subjectId);
+
+        if (rating.isReleased()) {
+            throw new ConflictApiException(
+                    "This rating was released to the employee on " + rating.getReleasedAt()
+                            + " and no longer needs signing off");
+        }
+        if (isSignedOff(rating)) {
+            // A second approval is a 409 and not a silent success: the caller believes they are
+            // doing something, and the first sign-off is already what unlocked the release.
+            throw new ConflictApiException("This rating has already been signed off");
+        }
+
+        Rating current = rating.getRating();
+        RatingCalibration audit = new RatingCalibration(
+                rating, current, current,
+                users.getReferenceById(currentUser.require().id()), note);
+        return mapper.apply(calibrations.save(audit));
+    }
+
+    /** Whether HR have looked at this rating at all - by adjusting it, or by approving it. */
+    private boolean isSignedOff(FinalRating rating) {
+        return calibrations.existsByFinalRatingId(rating.getId());
     }
 
     /**
@@ -219,6 +271,18 @@ public class RatingService {
         if (rating.isReleased()) {
             throw new ConflictApiException("This rating was already released on " + rating.getReleasedAt());
         }
+
+        // P-4.8: HR see the peer feedback, the manager's review and the number, and either
+        // adjust it or approve it as set. Only then may it go to the employee. A 409 and not a
+        // 403 - the manager holds RELEASE_RATING throughout, and it is the state of the
+        // sign-off that refuses.
+        if (!isSignedOff(rating) && hrCouldSignOff(subject)) {
+            throw new ConflictApiException(
+                    "This rating is waiting for HR sign-off. HR review the peer feedback and"
+                            + " your review, then either calibrate the rating or approve it as"
+                            + " set, and it can be shared after that");
+        }
+
         rating.setReleasedAt(Instant.now());
         return mapper.apply(rating);
     }
@@ -297,6 +361,25 @@ public class RatingService {
      * fact P-4.4 exists to withhold. The {@code released} flag says whether there is anything
      * to read, never whether there is anything to know.
      */
+    /**
+     * Whether anybody could sign this rating off, which is what decides if the gate applies.
+     *
+     * <p>A gate nobody can open is not a gate, it is a stuck record. Where no HR user has
+     * authority over the subject's department the manager releases alone, because the
+     * alternative is a rating that can never reach the employee it belongs to.
+     *
+     * <p><b>The cost of that, stated:</b> revoking every grant over a department switches the
+     * requirement off for it rather than blocking releases. That is the Product Owner's call,
+     * taken on the ground that a permanently unreleasable rating is the worse failure. The
+     * grants are the Super Admin's to manage and they already decide who HR are.
+     *
+     * <p>Resolved per request like every other grant question (constraint 4), never cached.
+     */
+    private boolean hrCouldSignOff(ReviewSubject subject) {
+        return subject.departmentId() != null
+                && hrGrants.anyHrCovers(subject.departmentId(), subject.id());
+    }
+
     public record OwnRating(Long cycleId, Rating rating, Instant releasedAt,
                             String managerFeedback, boolean released) {
     }

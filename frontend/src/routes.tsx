@@ -6,13 +6,11 @@ import { Loading } from './components/States'
 import { MyReviews } from './features/my/MyReviews'
 import { SelfReview } from './features/my/SelfReview'
 import { PeerTasks } from './features/my/PeerTasks'
-import { MyRating } from './features/my/MyRating'
 import { MyPlan } from './features/my/MyPlan'
 import { MyImprovementPlan } from './features/my/MyImprovementPlan'
 import { Team } from './features/manager/Team'
 import { ReviewDetail } from './features/manager/ReviewDetail'
 import { MemberPlan } from './features/manager/MemberPlan'
-import { HrScope } from './features/hr/HrScope'
 import { CycleMonitoring } from './features/hr/CycleMonitoring'
 import { HrReviews } from './features/hr/HrReviews'
 import { Calibration } from './features/hr/Calibration'
@@ -56,7 +54,13 @@ export function AppRoutes() {
         <Route path="my/reviews" element={<MyReviews />} />
         <Route path="my/self-review" element={<SelfReview />} />
         <Route path="my/peer-tasks" element={<PeerTasks />} />
-        <Route path="my/rating" element={<MyRating />} />
+        {/*
+          The rating used to have a page of its own. It says the same thing "My review" already
+          says, on the same cycle, from an endpoint that answers the same question - and two
+          screens for one fact is two places for the wording of a withheld rating to drift.
+          Redirected rather than dropped, for anybody holding the old link.
+        */}
+        <Route path="my/rating" element={<Navigate to="/my/reviews" replace />} />
         <Route path="my/plan" element={<MyPlan />} />
         <Route path="my/improvement-plan" element={<MyImprovementPlan />} />
 
@@ -64,7 +68,6 @@ export function AppRoutes() {
         <Route path="manager/reviews/:subjectId" element={<ReviewDetail />} />
         <Route path="manager/plans/:userId" element={<MemberPlan />} />
 
-        <Route path="hr/scope" element={<HrScope />} />
         <Route path="hr/cycles" element={<CycleMonitoring />} />
         <Route path="hr/reviews" element={<HrReviews />} />
         <Route path="hr/reviews/:subjectId" element={<Calibration />} />

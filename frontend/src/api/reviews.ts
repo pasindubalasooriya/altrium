@@ -62,6 +62,13 @@ export function useReviewRecord(subjectId: number | undefined, cycleId: number |
   })
 }
 
+/**
+ * Kept, unused by any screen.
+ *
+ * `GET /api/reviews/my-rating` takes no subject id, so it cannot be asked the question P-4.4
+ * forbids, and its denial tests are part of the evidence for that policy. The screen that
+ * called it was merged into "My review"; the endpoint is not the redundant half.
+ */
 export function useMyRating(cycleId: number | undefined) {
   return useQuery({
     queryKey: ['my-rating', cycleId],
@@ -148,6 +155,10 @@ export function useAssignPeers(subjectId: number | undefined, cycleId: number | 
       api.put<PeerAssignment[]>(`/api/reviews/${subjectId}/peers`, { peerIds }, { cycleId }),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ['peers', subjectId] })
+      // The record carries the peer section, and replacing the peers changes whose feedback
+      // belongs on it. Leaving it stale would show the departed reviewer's draft alongside
+      // the new pair.
+      void queries.invalidateQueries({ queryKey: ['review', subjectId] })
     },
   })
 }

@@ -6,33 +6,10 @@ import type { Calibration, ImprovementPlan, Rating } from './types'
  * HR data access.
  *
  * Everything here is scoped on the server by the grants resolved **this request** (P-2.5).
- * Nothing is cached across a grant change beyond a normal refetch, and no scope is held in
- * the client: `useHrScope` is a display of what the server resolved, never an input to any
- * other call.
+ * Nothing is cached across a grant change beyond a normal refetch, and **no scope is held in
+ * the client at all**: no call below names a department, so there is nothing here that could
+ * disagree with the server about what this caller may reach.
  */
-
-export interface ScopedDepartment {
-  id: number
-  name: string
-  isOwnDepartment: boolean
-}
-
-/**
- * `note` is written by the server in plain language, and this client displays it rather than
- * composing its own. The rule it explains - why your own department is missing - is the one
- * most likely to look like a bug, and two wordings of it would eventually disagree.
- */
-export interface HrScope {
-  departments: ScopedDepartment[]
-  ownDepartmentId: number | null
-  ownDepartmentExcluded: boolean
-  ownDepartmentLiftedByExplicitGrant: boolean
-  note: string
-}
-
-export function useHrScope() {
-  return useQuery({ queryKey: ['hr-scope'], queryFn: () => api.get<HrScope>('/api/hr/scope') })
-}
 
 export interface DepartmentProgress {
   departmentId: number
@@ -74,6 +51,28 @@ export function useCalibrate(subjectId: number | undefined, cycleId: number | un
       api.put<Calibration>(
         `/api/reviews/${subjectId}/rating/calibration`,
         { rating, note },
+        { cycleId },
+      ),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ['calibration', subjectId] })
+      void queries.invalidateQueries({ queryKey: ['review', subjectId] })
+    },
+  })
+}
+
+/**
+ * HR sign a rating off unchanged, which is what lets the manager share it (P-4.8).
+ *
+ * A separate call from calibration rather than a flag on it: "HR moved this" and "HR agreed
+ * with this" are different things to have happened, and the audit trail says which.
+ */
+export function useApproveRating(subjectId: number | undefined, cycleId: number | undefined) {
+  const queries = useQueryClient()
+  return useMutation({
+    mutationFn: (note: string) =>
+      api.post<Calibration>(
+        `/api/reviews/${subjectId}/rating/approval`,
+        { note },
         { cycleId },
       ),
     onSuccess: () => {

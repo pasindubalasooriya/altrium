@@ -99,7 +99,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
      * refuses, which reads as a bug in the system rather than as the rule it is.
      *
      * <p>Excluded: the subject themselves, the subject's manager - who already writes the
-     * manager review - and anybody deactivated (P-0.7).
+     * manager review - anybody deactivated (P-0.7), the Super Admin (P-9.5), any HR user
+     * outside the subject's own department (P-3.12), and <b>the Leadership</b> (P-3.13).
      *
      * <p>Paged, and never a full roster in one response: nothing may be hardcoded to the size
      * of the organisation. Cross-department is permitted, so the candidate set is genuinely
@@ -112,11 +113,15 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
               AND u.id <> :subjectId
               AND (:managerId IS NULL OR u.id <> :managerId)
               AND com.altrium.org.Role.SUPER_ADMIN NOT MEMBER OF u.roles
+              AND com.altrium.org.Role.LEADERSHIP NOT MEMBER OF u.roles
+              AND (com.altrium.org.Role.HR NOT MEMBER OF u.roles
+                   OR (:subjectDepartmentId IS NOT NULL AND u.department.id = :subjectDepartmentId))
               AND (:name IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :name, '%')))
             ORDER BY u.fullName
             """)
     Page<AppUser> findPeerCandidates(@Param("subjectId") Long subjectId,
                                      @Param("managerId") Long managerId,
+                                     @Param("subjectDepartmentId") Long subjectDepartmentId,
                                      @Param("name") String name,
                                      Pageable pageable);
 }

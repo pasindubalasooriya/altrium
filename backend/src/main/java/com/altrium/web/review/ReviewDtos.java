@@ -5,6 +5,7 @@ import com.altrium.review.FinalRating;
 import com.altrium.review.ManagerReview;
 import com.altrium.review.PeerReview;
 import com.altrium.review.Rating;
+import com.altrium.review.RatingStage;
 import com.altrium.review.ReviewCycle;
 import com.altrium.review.ReviewReadService;
 import com.altrium.review.SelfReview;
@@ -67,9 +68,17 @@ public final class ReviewDtos {
             Long managerId,
             boolean subjectActive,
             Long cycleId,
-            String cycleLabel) {
+            String cycleLabel,
+            Integer peerReviewsSubmitted,
+            RatingStage ratingStage) {
 
-        public static ReviewSummary of(CycleParticipant participant) {
+        /**
+         * @param row carries the peer count only where the caller had grounds for it. Null here
+         *            is omitted from the JSON entirely, which is what the subject's own row
+         *            gets - a zero would be the count P-3.3 withholds from them
+         */
+        public static ReviewSummary of(ReviewReadService.ReviewRow row) {
+            CycleParticipant participant = row.participant();
             var subject = participant.getSubject();
             return new ReviewSummary(
                     subject.getId(),
@@ -78,7 +87,32 @@ public final class ReviewDtos {
                     subject.getManager() == null ? null : subject.getManager().getId(),
                     subject.isActive(),
                     participant.getCycle().getId(),
-                    participant.getCycle().label());
+                    participant.getCycle().label(),
+                    row.peerReviewsSubmitted(),
+                    row.ratingStage());
+        }
+
+        /**
+         * The same summary as the header of a single record, where the count has no business
+         * being.
+         *
+         * <p>A record already carries the peer section itself when the caller has grounds for
+         * it, so a count here would be a second route to the same number - and a second route
+         * is a second thing to get wrong. The subject's own record is the case that matters:
+         * their peer section is never built, and this must not quietly hand them its size.
+         */
+        public static ReviewSummary withoutPeerCount(CycleParticipant participant) {
+            var subject = participant.getSubject();
+            return new ReviewSummary(
+                    subject.getId(),
+                    subject.getFullName(),
+                    participant.getDepartment() == null ? null : participant.getDepartment().getName(),
+                    subject.getManager() == null ? null : subject.getManager().getId(),
+                    subject.isActive(),
+                    participant.getCycle().getId(),
+                    participant.getCycle().label(),
+                    null,
+                    null);
         }
     }
 
@@ -123,21 +157,38 @@ public final class ReviewDtos {
         }
     }
 
-    public record FinalRatingView(Rating rating, Instant setAt, Instant releasedAt) {
+    public record FinalRatingView(Rating rating, Instant setAt, Instant releasedAt,
+                                 Boolean signedOffByHr) {
 
         /** {@code setBy} is not exposed: it is always {@code mgr(S)}, and the subject reading
          *  their own rating gains nothing from the id but a second place it could leak. */
-        public static FinalRatingView of(FinalRating rating) {
-            return new FinalRatingView(rating.getRating(), rating.getSetAt(), rating.getReleasedAt());
+        public static FinalRatingView of(FinalRating rating, Boolean signedOffByHr) {
+            return new FinalRatingView(rating.getRating(), rating.getSetAt(),
+                    rating.getReleasedAt(), signedOffByHr);
+        }
+
+        /**
+         * The same rating with the sign-off withheld.
+         *
+         * <p>Whether HR have been through this rating is part of the calibration trail, and
+         * {@code READ_RATING_AUDIT} has no {@code SELF} grounds (P-4.7). Null rather than false,
+         * for the reason the peer count is absent rather than zero: a false is an answer.
+         */
+        public static FinalRatingView withoutSignOff(FinalRating rating) {
+            return of(rating, null);
         }
     }
 
     /**
      * One reviewee's record, containing only the sections the caller had grounds for.
      *
-     * @param visibleSections what the caller can see, named - so a client can render
-     *                        honestly ("you cannot see peer feedback") instead of guessing
-     *                        from nulls, and so a denial is legible rather than mysterious
+     * @param visibleSections the sections the caller had <em>grounds</em> for, named - so a
+     *                        client can render honestly instead of guessing from nulls. It is
+     *                        the grounds and not the content: a manager who may read peer
+     *                        feedback is named here even when no peer has written yet, so the
+     *                        screen says "not submitted yet" rather than accusing them of
+     *                        lacking access they plainly have. Deriving this from whether the
+     *                        section arrived collapses those two cases, and the wrong one wins.
      */
     public record ReviewRecordView(
             ReviewSummary summary,
@@ -148,23 +199,21 @@ public final class ReviewDtos {
             List<String> visibleSections) {
 
         public static ReviewRecordView of(ReviewReadService.ReviewRecord record) {
-            var sections = new java.util.ArrayList<String>();
-            record.selfReview().ifPresent(r -> sections.add("SELF_REVIEW"));
-            record.managerReview().ifPresent(r -> sections.add("MANAGER_REVIEW"));
-            if (!record.peerReviews().isEmpty()) {
-                sections.add("PEER_REVIEWS");
-            }
-            record.finalRating().ifPresent(r -> sections.add("FINAL_RATING"));
+            // Reported, not recomputed. The read service made these decisions section by
+            // section and is the only place that knows how each one was reached.
+            List<String> sections = record.grounds().stream().map(Enum::name).sorted().toList();
 
             return new ReviewRecordView(
-                    ReviewSummary.of(record.participant()),
+                    ReviewSummary.withoutPeerCount(record.participant()),
                     record.selfReview().map(SelfReviewView::of).orElse(null),
                     record.managerReview().map(ManagerReviewView::of).orElse(null),
                     record.peerReviews().isEmpty()
                             ? null
                             : record.peerReviews().stream().map(PeerReviewView::of).toList(),
-                    record.finalRating().map(FinalRatingView::of).orElse(null),
-                    List.copyOf(sections));
+                    record.finalRating()
+                            .map(rating -> FinalRatingView.of(rating, record.ratingSignedOff()))
+                            .orElse(null),
+                    sections);
         }
     }
 }

@@ -14,13 +14,72 @@ import { ApiError } from './errors'
 
 type TokenProvider = () => Promise<string>
 
-let getToken: TokenProvider = async () => {
-  throw new Error('API client used before a token provider was installed')
+/**
+ * How long a request will wait for the provider before giving up.
+ *
+ * There has to be a limit. A request that waits forever is a screen that spins forever, which
+ * is harder to diagnose than a failure - but the wait itself is the point, see below.
+ */
+const PROVIDER_TIMEOUT_MS = 10_000
+
+let provider: TokenProvider | null = null
+let announce: (installed: TokenProvider) => void = () => {}
+let firstInstall = new Promise<TokenProvider>((resolve) => {
+  announce = resolve
+})
+
+/**
+ * Called from the auth provider as soon as the SDK can mint tokens.
+ *
+ * Safe to call repeatedly. It is called on every render rather than from an effect, and the
+ * reason is the bug this replaced: React runs effects child-first, so an effect in a component
+ * that wraps the whole app runs <em>after</em> every screen below it has mounted and fired its
+ * first query. Those queries found no provider and failed, and the failure was indistinguishable
+ * from an expired session - so a refresh reliably showed "your session has ended" while the
+ * session was perfectly healthy.
+ */
+export function installTokenProvider(next: TokenProvider): void {
+  provider = next
+  announce(next)
 }
 
-/** Called once, from the auth provider, as soon as the SDK can mint tokens. */
-export function installTokenProvider(provider: TokenProvider): void {
-  getToken = provider
+/**
+ * The provider, waiting for it if it is not installed yet.
+ *
+ * Waiting rather than throwing is what makes mount order stop mattering. Installing during
+ * render already fixes the ordering; this makes the client robust to it being got wrong again,
+ * which is worth having, because the failure it produced looked like something else entirely
+ * and cost far more to diagnose than it should have.
+ */
+async function currentProvider(): Promise<TokenProvider> {
+  if (provider) {
+    return provider
+  }
+  return Promise.race([
+    firstInstall,
+    new Promise<TokenProvider>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('No token provider was installed; is AltriumAuthProvider mounted?')),
+        PROVIDER_TIMEOUT_MS,
+      ),
+    ),
+  ])
+}
+
+const getToken: TokenProvider = async () => (await currentProvider())()
+
+/**
+ * Puts the module back to "nothing installed yet", for the one test that needs it.
+ *
+ * Exported only so the race above can be reproduced: every other test installs a provider in
+ * its setup, which is precisely the state that hid this bug for so long. Nothing in the app
+ * calls this.
+ */
+export function resetTokenProviderForTest(): void {
+  provider = null
+  firstInstall = new Promise<TokenProvider>((resolve) => {
+    announce = resolve
+  })
 }
 
 export type QueryValue = string | number | boolean | undefined | null
@@ -52,28 +111,71 @@ async function describe(response: Response): Promise<string> {
   }
 }
 
+/**
+ * The bearer token, or a 401 that says what actually happened.
+ *
+ * A failure here is a session problem and never a server problem, so it is classified as 401
+ * and reaches the UI as "sign in again" rather than as an outage. The two are indistinguishable
+ * to a person looking at a blank screen, and only one of them is theirs to act on.
+ */
+async function bearerToken(): Promise<string> {
+  try {
+    const token = await getToken()
+    if (!token) {
+      // The SDK can resolve with nothing rather than rejecting, which is the same dead session
+      // wearing a different shape. Treated identically, or an empty Authorization header goes
+      // to the server and comes back as a 401 nobody can explain.
+      console.warn('[altrium] the auth SDK returned no access token; treating as signed out')
+      throw new ApiError(401, 'Your session has ended.')
+    }
+    return token
+  } catch (cause) {
+    if (cause instanceof ApiError) {
+      throw cause
+    }
+    // Logged, because this and a 401 from the server produce the same screen and have
+    // completely different causes: this one never reached the network.
+    console.warn('[altrium] could not obtain an access token; treating as signed out', cause)
+    throw new ApiError(401, 'Your session has ended.')
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
   options: { query?: Record<string, QueryValue>; body?: unknown } = {},
 ): Promise<T> {
+  // Obtained before the try below, and deliberately outside it. The SDK rejects when there is
+  // no live session left to mint from - the refresh token has expired, or the session was
+  // ended in another tab - and while this call sat inside the fetch guard, that rejection was
+  // reported as "could not reach the Altrium API". The backend was invariably running; the
+  // person had simply been away for an hour, and was sent to go and check a server.
+  const token = await bearerToken()
+
   let response: Response
   try {
     response = await fetch(url(path, options.query), {
       method,
       headers: {
-        Authorization: `Bearer ${await getToken()}`,
+        Authorization: `Bearer ${token}`,
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     })
-  } catch {
+  } catch (cause) {
     // The browser refuses to say whether this was the network, DNS or a CORS rejection, so
     // neither do we. Guessing "CORS" here would be wrong most of the time it was shown.
+    console.warn('[altrium] fetch itself failed - network, DNS or CORS', method, path, cause)
     throw new ApiError(0, 'Could not reach the Altrium API.')
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      // The other route to the same screen: a token was obtained and the server rejected it.
+      // Distinguished here only in the log, because to the person looking at it the situation
+      // is identical - they have to sign in again either way.
+      console.warn('[altrium] the server rejected the access token (401)', method, path)
+    }
     throw new ApiError(response.status, await describe(response))
   }
 

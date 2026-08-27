@@ -3,7 +3,8 @@ import { CycleSelect, useSelectedCycle } from '../../components/CycleSelect'
 import { useMyReviewRecord, useSaveSelfReview } from '../../api/reviews'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { Button, Card, Field, TextArea, WriteFailure, when } from '../../components/Form'
-import { Loading, QueryFailure } from '../../components/States'
+import { Loading, NotUnderReview, QueryFailure } from '../../components/States'
+import { isNotFound } from '../../api/errors'
 
 /**
  * Writing the caller's own self-review.
@@ -49,6 +50,11 @@ export function SelfReview() {
 
       {cycleId === undefined ? null : isPending ? (
         <Loading />
+      ) : isNotFound(error) ? (
+        // Nobody is under review in every cycle, and the write would be refused anyway - the
+        // server checks participation before it will save a self-review. Showing the empty
+        // form here would invite somebody to type an essay into a 404.
+        <NotUnderReview what="self-review" />
       ) : error ? (
         <QueryFailure error={error} />
       ) : (
@@ -93,9 +99,6 @@ export function SelfReview() {
                 <Button variant="primary" onClick={() => write(true)} busy={save.isPending} busyLabel="Submitting">
                   Submit
                 </Button>
-                <span className="text-xs text-muted">
-                  Submitting is final. Your manager and HR can then read it.
-                </span>
               </div>
             )}
           </div>

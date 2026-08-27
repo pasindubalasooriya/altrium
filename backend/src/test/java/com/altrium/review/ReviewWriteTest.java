@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -234,6 +236,45 @@ class ReviewWriteTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"peerIds\":[" + aisha.getId() + "," + john.getId() + "]}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("P-3.12: an HR user cannot be assigned as a peer outside their own department")
+    void P_3_12_hrIsRefusedAsAPeerOutsideTheirDepartment() throws Exception {
+        Department engineering = org.department("Engineering");
+        Department people = org.department("People");
+        AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha", Role.EMPLOYEE);
+        AppUser samuel = org.userIn(people, "samuel", Role.EMPLOYEE);
+        AppUser kevin = org.userIn(people, "kevin", Role.EMPLOYEE, Role.HR);
+        AppUser hana = org.userIn(people, "hana", Role.EMPLOYEE, Role.HR);
+        john.setManager(elena);
+        samuel.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.participant(cycle, samuel);
+        reviews.flush();
+
+        // Refused on the write and not only absent from the candidate list, because the list is
+        // a convenience and this is the rule - an id typed straight into the request lands here.
+        // Note there is no grant anywhere in this test: the rule is the role and the department,
+        // not today's grants, which the Super Admin could widen tomorrow and turn an assignment
+        // already made into a conflict.
+        mvc.perform(put(REVIEWS + "/" + john.getId() + "/peers").param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"peerIds\":[" + aisha.getId() + "," + kevin.getId() + "]}"))
+                .andExpect(status().isBadRequest());
+
+        // Inside HR they can and they should. Samuel sits in People with both of them.
+        mvc.perform(put(REVIEWS + "/" + samuel.getId() + "/peers").param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"peerIds\":[" + kevin.getId() + "," + hana.getId() + "]}"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -503,15 +544,52 @@ class ReviewWriteTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submitted").value(true));
 
-        // P-4.4 gives the subject the manager's feedback. The rating is a separate stream and
-        // is still absent, because nobody has set one.
+        // Submitted, and not yet John's to read. P-4.4 gives the subject their rating **and**
+        // their manager's feedback, and gives them together: the feedback is the assessment in
+        // words, so handing it over first would tell him the outcome before anybody had decided
+        // to tell him. This assertion used to run the other way round.
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managerReview").doesNotExist())
+                .andExpect(jsonPath("$.visibleSections").value(not(hasItem("MANAGER_REVIEW"))))
+                .andExpect(jsonPath("$.finalRating").doesNotExist());
+
+        // Elena reads what she wrote throughout - the gate constrains the subject only, and
+        // somebody has to be able to see the review they are about to release.
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managerReview.feedback")
+                        .value("a strong quarter, ready for more scope"));
+
+        mvc.perform(put(REVIEWS + "/" + john.getId() + "/rating")
+                        .param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":\"MEETS_EXPECTATIONS\"}"))
+                .andExpect(status().isOk());
+
+        // Setting the rating is not sharing it. Still nothing for John.
+        mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managerReview").doesNotExist())
+                .andExpect(jsonPath("$.finalRating").doesNotExist());
+
+        mvc.perform(post(REVIEWS + "/" + john.getId() + "/rating/release")
+                        .param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena")))
+                .andExpect(status().isOk());
+
+        // Release opens both at once, which is the whole point of gating them together.
         mvc.perform(get(REVIEWS + "/" + john.getId()).param("cycleId", cycleParam(cycle))
                         .header("Authorization", bearer("john")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.managerReview.feedback")
                         .value("a strong quarter, ready for more scope"))
                 .andExpect(jsonPath("$.managerReview.managerName").value("elena"))
-                .andExpect(jsonPath("$.finalRating").doesNotExist());
+                .andExpect(jsonPath("$.finalRating.rating").value("MEETS_EXPECTATIONS"));
     }
 
     @Test
@@ -622,5 +700,38 @@ class ReviewWriteTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"peerIds\":[" + tom.getId() + "," + john.getId() + "]}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("P-3.13: Leadership are refused as peers on the write as well")
+    void P_3_13_leadershipRefusedAsPeer() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser richard = org.user("richard", Role.EMPLOYEE, Role.LEADERSHIP);
+        AppUser elena = org.userIn(engineering, "elena", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha", Role.EMPLOYEE);
+        AppUser mei = org.userIn(engineering, "mei", Role.EMPLOYEE);
+        elena.setManager(richard);
+        john.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.flush();
+
+        String peers = REVIEWS + "/" + john.getId() + "/peers";
+
+        mvc.perform(put(peers).param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"peerIds\":[" + aisha.getId() + "," + richard.getId() + "]}"))
+                .andExpect(status().isBadRequest());
+
+        // Two ordinary colleagues are still fine, so the rule has not taken the pool with it.
+        mvc.perform(put(peers).param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"peerIds\":[" + aisha.getId() + "," + mei.getId() + "]}"))
+                .andExpect(status().isOk());
     }
 }

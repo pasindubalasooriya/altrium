@@ -235,7 +235,8 @@ public class ReviewWriteService {
         authorization.require(Capability.ASSIGN_PEERS, subject);
 
         String filter = (name == null || name.isBlank()) ? null : name.trim();
-        return users.findPeerCandidates(subjectId, subject.managerId(), filter, pageable)
+        return users.findPeerCandidates(
+                        subjectId, subject.managerId(), subject.departmentId(), filter, pageable)
                 .map(mapper);
     }
 
@@ -321,6 +322,13 @@ public class ReviewWriteService {
      * as its only grounds - and they will not be forever. Reporting lines move, and inferring
      * the author later would silently reattribute this quarter's review to whoever holds the
      * post next year.
+     *
+     * <p><b>Nothing may be written until both peers have submitted</b>, drafts included. The
+     * gate began on the submit branch alone, on the reading that only the irreversible act
+     * needed to wait; the Product Owner has since taken the stronger one. The point of the
+     * rule is that the manager's assessment is <em>formed</em> in light of the peer input, and
+     * a draft written first and submitted afterwards satisfies the timing while defeating the
+     * purpose - the words are already on the page by the time the peer feedback arrives.
      */
     public <T> T saveManagerReview(Long cycleId, Long subjectId, String feedback, boolean submit,
                                    Function<ManagerReview, T> mapper) {
@@ -330,6 +338,12 @@ public class ReviewWriteService {
 
         ReviewCycle cycle = requireOpenCycle(cycleId);
         requireParticipant(cycle, subjectId, "That person is not under review in this cycle");
+
+        // Both peers first, by Product Owner ruling - see PeerFeedbackGate for why this
+        // deviates from scenario section 5 and why it has no override. The gate is checked
+        // before the row is looked up, so a blocked attempt does not leave an empty review
+        // behind that the monitoring counts would then have to explain.
+        peerFeedbackGate.requireBothPeersSubmitted(cycle, subjectId, "Writing a manager review");
 
         Long callerId = currentUser.require().id();
         ManagerReview review = managerReviews.findByCycleIdAndSubjectId(cycleId, subjectId)
@@ -349,11 +363,6 @@ public class ReviewWriteService {
             if (feedback == null || feedback.isBlank()) {
                 throw new ValidationApiException("A manager review cannot be submitted empty");
             }
-            // Both peers first, by Product Owner ruling - see PeerFeedbackGate for why this
-            // deviates from scenario section 5 and why it has no override. The gate sits on the
-            // submit branch alone: the manager drafts freely while the peer stream fills up,
-            // and only the irreversible act waits.
-            peerFeedbackGate.requireBothPeersSubmitted(cycle, subjectId, "Submitting a manager review");
             review.setSubmittedAt(Instant.now());
         }
         return mapper.apply(review);
@@ -388,6 +397,29 @@ public class ReviewWriteService {
             throw new ValidationApiException(
                     peer.getFullName() + " is deactivated and cannot be assigned as a peer");
         }
+        if (peer.getRoles().contains(Role.LEADERSHIP)) {
+            // P-3.13, a Product Owner ruling. Leadership sit a tier or two above the people
+            // being reviewed, so they are not colleagues in the sense section 5 means - peer
+            // feedback is what somebody you work alongside says about working with you, and a
+            // remark from two levels up is not that whatever it says. Where they do have a
+            // direct report they write that person's manager review, which is the channel that
+            // already exists for it (P-2.6).
+            throw new ValidationApiException(
+                    peer.getFullName() + " is in Leadership and does not write peer feedback."
+                            + " Where they manage somebody directly they write the manager"
+                            + " review instead (P-3.13)");
+        }
+        if (peer.getRoles().contains(Role.HR) && !inSameDepartment(peer, subject)) {
+            // P-3.12, a Product Owner ruling. An HR user who peer-reviews somebody in a
+            // department they hold writes input to a rating they then calibrate, and reads
+            // their own peer review back as HR while doing it. Rather than tie the rule to the
+            // grant - which can be added the day after the assignment, creating the conflict
+            // retroactively - HR write peer feedback only inside their own team, where their
+            // colleagues are the people they actually work alongside.
+            throw new ValidationApiException(
+                    peer.getFullName() + " is in HR and can only peer-review inside their own"
+                            + " department, because HR calibrate the ratings elsewhere (P-3.12)");
+        }
         if (peer.getRoles().contains(Role.SUPER_ADMIN)) {
             // P-9.5. Peer feedback is what a colleague says about working with somebody, and
             // the Super Admin is a dedicated platform account rather than a colleague. Refused
@@ -398,6 +430,20 @@ public class ReviewWriteService {
                             + " colleague, and cannot be assigned as a peer (P-9.5)");
         }
         return peer;
+    }
+
+    /**
+     * Whether two people sit in the same department, treating "no department" as matching
+     * nobody rather than as matching every other person without one.
+     *
+     * <p>The Leadership have no department, so a null on either side has to be a refusal here.
+     * Read the other way it would put every HR user back in the pool for every Leadership
+     * subject, which is the case the rule most obviously covers.
+     */
+    private boolean inSameDepartment(AppUser peer, ReviewSubject subject) {
+        return peer.getDepartment() != null
+                && subject.departmentId() != null
+                && peer.getDepartment().getId().equals(subject.departmentId());
     }
 
     /**

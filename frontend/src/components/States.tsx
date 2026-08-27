@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ApiError, isForbidden } from '../api/errors'
+import { ApiError, isForbidden, isUnauthenticated } from '../api/errors'
+import { recoverSession } from '../auth/session'
 
 /**
  * The one denial screen.
@@ -36,6 +37,22 @@ export function NotProvisioned() {
   )
 }
 
+/**
+ * The caller has no review in the selected cycle.
+ *
+ * An ordinary state, not a failure, so it does not wear the warning colour. Employees are put
+ * into a cycle by cohort and each cohort is reviewed in its own quadrimester, so most people
+ * are outside most cycles most of the time. This used to render "Something went wrong loading
+ * this", which sent a manager looking for a broken server.
+ */
+export function NotUnderReview({ what = 'review' }: { what?: string }) {
+  return (
+    <Panel tone="plain" title={`No ${what} for this cycle`}>
+      <p>You are not under review in the cycle selected above.</p>
+    </Panel>
+  )
+}
+
 export function Loading({ what = 'Loading' }: { what?: string }) {
   return <p className="p-6 text-muted">{what}…</p>
 }
@@ -55,6 +72,9 @@ export function QueryFailure({ error }: { error: unknown }) {
   if (isForbidden(error)) {
     return <Forbidden />
   }
+  if (isUnauthenticated(error)) {
+    return <SessionEnded />
+  }
   const detail =
     error instanceof ApiError && error.status === 0
       ? 'Could not reach the Altrium API. Is the backend running?'
@@ -62,6 +82,41 @@ export function QueryFailure({ error }: { error: unknown }) {
   return (
     <Panel tone="warn" title="Could not load">
       <p>{detail}</p>
+    </Panel>
+  )
+}
+
+/**
+ * An expired session, told apart from an outage.
+ *
+ * These used to render identically, and the wrong one was shown far more often: a token
+ * lasts an hour, so anyone returning to an open tab met "is the backend running?" and went
+ * looking for a server that was fine. This says what happened and offers the way back, which
+ * an outage screen cannot.
+ */
+function SessionEnded() {
+  return (
+    <Panel tone="warn" title="Your session has ended">
+      <p>
+        You have been signed out, usually because the session expired. Signing in again picks
+        up exactly where you were, and nothing you had saved is lost.
+      </p>
+      {/*
+        A full sign-out, reached through an injected callback rather than by importing the auth
+        SDK here - States is imported by nearly every screen, and the SDK spawns a Web Worker
+        that jsdom has no answer for.
+
+        It has to be a sign-out and not a reload. Once the token can no longer be refreshed the
+        SDK still reports the session as authenticated, so a reload walks back through the
+        sign-in gate, fires the same request and returns to this panel.
+      */}
+      <button
+        type="button"
+        className="mt-3 rounded bg-brand px-4 py-2 text-sm font-medium text-ink"
+        onClick={() => recoverSession()}
+      >
+        Sign in again
+      </button>
     </Panel>
   )
 }

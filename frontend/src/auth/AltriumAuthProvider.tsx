@@ -1,7 +1,8 @@
 import { AuthProvider, useAuthContext } from '@asgardeo/auth-react'
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { config } from '../config'
 import { installTokenProvider } from '../api/client'
+import { installSessionRecovery } from './session'
 
 /**
  * Asgardeo, wired once.
@@ -27,11 +28,30 @@ export function AltriumAuthProvider({ children }: { children: ReactNode }) {
  * moment earlier - the kind of bug that looks like a backend problem.
  */
 function TokenBridge({ children }: { children: ReactNode }) {
-  const { getAccessToken } = useAuthContext()
+  const { getAccessToken, signOut } = useAuthContext()
 
-  useEffect(() => {
-    installTokenProvider(() => getAccessToken())
-  }, [getAccessToken])
+  // Installed during render, and deliberately not from an effect.
+  //
+  // React runs effects child-first, parent-last. This component wraps the entire app, so an
+  // effect here runs *after* every screen below it has mounted and fired its first query -
+  // and those queries then found no provider. On a first sign-in the loading state delayed the
+  // screens long enough to hide it; on a refresh the SDK restores the session before the first
+  // render, the screens mount immediately, and every one of them failed. The failure was
+  // reported as an ended session, which the session emphatically had not.
+  //
+  // Both calls are idempotent assignments, so running them on every render costs nothing and
+  // keeps them pointed at the current SDK callbacks, which is what the token bridge needs
+  // anyway: the SDK refreshes tokens underneath us, and a callback captured once would work
+  // for exactly as long as the first token lasted.
+  installTokenProvider(() => getAccessToken())
+
+  // Recovery from a dead session is a full sign-out, not a reload. Once the token can no longer
+  // be refreshed the SDK still reports the session as authenticated, so a reload passes the
+  // sign-in gate and fails again on the first request. signOut ends the session at Asgardeo,
+  // which is the only thing that actually clears it.
+  installSessionRecovery(async () => {
+    await signOut()
+  })
 
   return <>{children}</>
 }

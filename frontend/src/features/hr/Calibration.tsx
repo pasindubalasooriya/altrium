@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useCalibrationHistory, useReviewRecord } from '../../api/reviews'
-import { useCalibrate } from '../../api/hr'
+import { useApproveRating, useCalibrate } from '../../api/hr'
 import {
   Button,
   Card,
@@ -35,6 +35,7 @@ export function Calibration() {
   const { data: record, isPending, error } = useReviewRecord(id, cycleId || undefined)
   const history = useCalibrationHistory(id, cycleId || undefined)
   const calibrate = useCalibrate(id, cycleId || undefined)
+  const approve = useApproveRating(id, cycleId || undefined)
 
   const [rating, setRating] = useState<Rating>('MEETS_EXPECTATIONS')
   const [note, setNote] = useState('')
@@ -111,10 +112,7 @@ export function Calibration() {
               </Fact>
 
               <div className="mt-4 grid gap-3">
-                <Field
-                  label="Normalised rating"
-                  hint="Every change is recorded permanently, with your name against it."
-                >
+                <Field label="Normalised rating">
                   <Select
                     value={rating}
                     disabled={Boolean(current.releasedAt)}
@@ -127,7 +125,7 @@ export function Calibration() {
                     ))}
                   </Select>
                 </Field>
-                <Field label="Note" hint="Your reasoning, for whoever reads this later.">
+                <Field label="Note">
                   <TextArea value={note} onChange={(e) => setNote(e.target.value)} />
                 </Field>
 
@@ -137,9 +135,15 @@ export function Calibration() {
                   rating has been shared is 409. Both are the state of the record answering, and
                   both render as messages on this form.
                 */}
-                <WriteFailure error={calibrate.error} />
+                <WriteFailure error={calibrate.error ?? approve.error} />
 
-                <div>
+                {/*
+                  Two ways to sign the same rating off, and the trail records which. Approving
+                  is not a courtesy button: until HR do one or the other, the manager cannot
+                  share the rating at all (P-4.8), so this is the step the employee is waiting
+                  on when nothing appears to be happening.
+                */}
+                <div className="flex flex-wrap items-center gap-3">
                   <Button
                     variant="primary"
                     disabled={Boolean(current.releasedAt)}
@@ -149,6 +153,15 @@ export function Calibration() {
                   >
                     Calibrate
                   </Button>
+                  {!current.releasedAt && !current.signedOffByHr && (
+                    <Button
+                      busy={approve.isPending}
+                      busyLabel="Approving"
+                      onClick={() => approve.mutate(note)}
+                    >
+                      Approve as set
+                    </Button>
+                  )}
                   {current.releasedAt && (
                     <p className="mt-2 text-xs text-muted">
                       This rating has been shared with the employee and can no longer be
@@ -186,10 +199,6 @@ export function Calibration() {
               This rating has not been changed.
             </p>
           )}
-          <p className="mt-3 text-xs text-muted">
-            The employee never sees this history. They are shown their rating and their
-            manager’s feedback, and nothing about how it was arrived at.
-          </p>
         </Card>
       </div>
     </>
@@ -199,7 +208,7 @@ export function Calibration() {
 function Unavailable({ visible, what }: { visible: boolean; what: string }) {
   return (
     <p className="text-sm text-muted">
-      {visible ? `No ${what} has been written yet.` : `You do not have access to the ${what}.`}
+      {visible ? `No ${what} has been submitted yet.` : `You do not have access to the ${what}.`}
     </p>
   )
 }

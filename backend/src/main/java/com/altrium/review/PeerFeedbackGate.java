@@ -6,9 +6,13 @@ import org.springframework.stereotype.Component;
 /**
  * The rule that both of the manager's closing acts wait for both peer reviews.
  *
- * <p>A manager may not submit their review of an employee, nor set that employee's final
- * rating, until both assigned peers have submitted. Drafting is untouched: the manager writes
- * and saves freely, and it is only the irreversible act of submitting that waits.
+ * <p>A manager may not write their review of an employee, nor set that employee's final
+ * rating, until both assigned peers have submitted. <b>Drafting waits too.</b> The gate began
+ * on the submit branch alone, on the reading that only the irreversible act needed to hold;
+ * the Product Owner has since taken the stronger one. The purpose of the rule is that the
+ * manager's assessment is <em>formed</em> in light of the peer feedback, and a draft written
+ * beforehand and submitted afterwards satisfies the timing while defeating the purpose - the
+ * words are already on the page by the time the peer input arrives.
  *
  * <h2>This is a recorded deviation from scenario section 5</h2>
  *
@@ -29,7 +33,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>The manager holds {@code WRITE_MANAGER_REVIEW} and {@code SET_FINAL_RATING} throughout. It
  * is the state of the peer stream that forbids the write, so this is a conflict, exactly like a
- * duplicate peer submission. Nothing in this class decides access, and it is called only after
+ * duplicate peer submission. This matters more now that drafting is gated: a 403 would tell a
+ * manager they have no business reviewing their own report, which is false and would send them
+ * to an administrator for a permission they already hold. Nothing in this class decides access, and it is called only after
  * {@link com.altrium.auth.AuthorizationService} has already allowed the caller through.
  *
  * <h2>Why the count is safe to read here</h2>

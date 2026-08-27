@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   useAddGoal,
+  useSubmitGoal,
+  useReportProgress,
   useApproveGoal,
   useDevelopmentPlan,
   useEditGoal,
@@ -45,18 +47,28 @@ export function MemberPlan() {
   const approve = useApproveGoal(planKey)
   const moveDate = useMoveTargetDate(planKey)
   const remove = useRemoveGoal(planKey)
+  const submit = useSubmitGoal(planKey)
+  const progress = useReportProgress(planKey)
 
+  // `submit` is here and `agree` is not, which is what tells the shared goal row it is being
+  // rendered for the manager. Agreeing is the employee's alone (P-5.9).
   const actions: GoalActions = {
     add: add.mutate,
     edit: edit.mutate,
     approve: approve.mutate,
     moveDate: moveDate.mutate,
     remove: remove.mutate,
-    error: add.error ?? edit.error ?? approve.error ?? moveDate.error ?? remove.error,
+    submit: submit.mutate,
+    progress: progress.mutate,
+    error:
+      add.error ?? edit.error ?? approve.error ?? moveDate.error ?? remove.error
+      ?? submit.error ?? progress.error,
     busy:
       add.isPending ||
       edit.isPending ||
       approve.isPending ||
+      submit.isPending ||
+      progress.isPending ||
       moveDate.isPending ||
       remove.isPending,
   }
@@ -118,19 +130,13 @@ function OpenPlanForm({ userId, suspended }: { userId: number; suspended: boolea
   return (
     <Card title="Open an improvement plan">
       <div className="grid gap-3">
-        <Field
-          label="Consequence clause"
-          hint="What happens if the plan is not met. Required before HR can co-sign, and fixed once they have."
-        >
+        <Field label="Consequence clause">
           <TextArea
             value={consequenceClause}
             onChange={(e) => setConsequenceClause(e.target.value)}
           />
         </Field>
-        <Field
-          label="Deadline"
-          hint="Fixed once set. Nobody can extend a PIP deadline afterwards - not you, not HR, not an administrator."
-        >
+        <Field label="Deadline">
           <TextInput type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </Field>
 
@@ -146,10 +152,6 @@ function OpenPlanForm({ userId, suspended }: { userId: number; suspended: boolea
           >
             Open plan
           </Button>
-          <p className="mt-2 text-xs text-muted">
-            This puts the development plan on hold. The employee cannot see the improvement plan
-            until HR co-sign it.
-          </p>
         </div>
       </div>
     </Card>

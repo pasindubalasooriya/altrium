@@ -68,6 +68,12 @@ public enum Capability {
      */
     ASSIGN_PEERS(Kind.ARTIFACT, "P-1.3/P-3.6", DIRECT_MANAGER),
 
+    /**
+     * The manager's assessment (P-3.7). {@code SELF} is gated on release, like
+     * {@link #READ_FINAL_RATING} and for the same reason (P-4.4): the feedback is the rating
+     * in words, so releasing one without the other discloses the outcome anyway. The manager
+     * and HR read it throughout - somebody has to write and check it.
+     */
     READ_MANAGER_REVIEW(Kind.ARTIFACT, "P-3.7", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
     WRITE_MANAGER_REVIEW(Kind.ARTIFACT, "P-3.7", DIRECT_MANAGER),
 
@@ -116,8 +122,45 @@ public enum Capability {
 
     READ_DEVELOPMENT_PLAN(Kind.ARTIFACT, "P-5.1", SELF, DIRECT_MANAGER, HR_IN_SCOPE),
 
-    /** HR is read-only on a PDP (P-5.1): present on the read above, absent here. */
-    WRITE_DEVELOPMENT_PLAN(Kind.ARTIFACT, "P-5.1", SELF, DIRECT_MANAGER),
+    /**
+     * Drafting a development goal: writing it, rewording it while still a draft, deleting it.
+     *
+     * <p>HR is read-only on a PDP (P-5.1): present on the read above, absent here.
+     *
+     * <p>{@link Grounds#SELF} is absent too, which is a <b>Product Owner ruling and a deviation
+     * from scenario section 8</b> ("collaborative between manager and employee") and section 6
+     * ("manager and employee own it"). Under the ruling the manager writes the goals and the
+     * employee agrees to them. The collaboration survives, but as
+     * {@link #AGREE_DEVELOPMENT_GOAL} and {@link #REPORT_GOAL_PROGRESS} rather than as shared
+     * authorship - see P-5.9.
+     *
+     * <p>Without those two the PDP would become indistinguishable from a PIP, which is put to
+     * an employee rather than agreed with them. The difference between the growth track and the
+     * corrective track is worth more than one capability list.
+     */
+    WRITE_DEVELOPMENT_PLAN(Kind.ARTIFACT, "P-5.9", DIRECT_MANAGER),
+
+    /**
+     * The employee accepting a goal their manager has submitted (P-5.9).
+     *
+     * <p>{@code SELF} alone, and that is the whole point: nobody agrees on the employee's
+     * behalf. Not their manager, who wrote it; not HR, who may read the plan and write nothing
+     * to it; not the Super Admin, who reads no plan at all.
+     */
+    AGREE_DEVELOPMENT_GOAL(Kind.ARTIFACT, "P-5.9", SELF),
+
+    /**
+     * Reporting how an agreed goal is going (P-5.9).
+     *
+     * <p>Written into a field of its own, never over the goal's wording, so reporting progress
+     * cannot quietly restate the goal that was agreed.
+     *
+     * <p>{@link Grounds#DIRECT_MANAGER} is listed alongside {@code SELF} because a manager
+     * records progress from a conversation as often as the employee types it themselves, and
+     * section 8 asks for progress to be "tracked and updated" without saying by whom. HR is
+     * absent: they read the plan and write nothing to it.
+     */
+    REPORT_GOAL_PROGRESS(Kind.ARTIFACT, "P-5.9", SELF, DIRECT_MANAGER),
 
     /** Only {@code mgr(S)} marks a goal complete, on either plan type (P-5.2). */
     APPROVE_GOAL(Kind.ARTIFACT, "P-5.2", DIRECT_MANAGER),
@@ -125,10 +168,10 @@ public enum Capability {
     /**
      * Moving a development goal's target date (P-5.5).
      *
-     * <p>Separate from {@link #WRITE_DEVELOPMENT_PLAN}, which the employee also holds, because
-     * P-5.5 names {@code mgr(S)} specifically for the dates. The employee writes what the goal
-     * is and how it is going; when it is due is agreed with their manager, and rescheduling it
-     * unilaterally would make the date decorative.
+     * <p>Kept separate from {@link #WRITE_DEVELOPMENT_PLAN} even though both are now the
+     * manager's, because they part company after agreement: the wording is fixed at that
+     * moment and the date is not. Section 8 asks for dates that move "as project priorities
+     * change", so the one thing a manager may still alter on an agreed goal is when it is due.
      *
      * <p>There is deliberately no PIP equivalent. A PIP deadline is immutable once set, which
      * is {@link #EXTEND_PIP_DEADLINE} with its empty grounds set.
@@ -143,10 +186,13 @@ public enum Capability {
     /**
      * Drafting the plan: its goals and its consequence clause.
      *
-     * <p>{@link Grounds#SELF} is absent, which is the difference between the two instruments. A
-     * development plan is written <em>with</em> the employee and they hold
-     * {@link #WRITE_DEVELOPMENT_PLAN}; an improvement plan is put <em>to</em> them, and an
-     * employee who could edit their own consequence clause would be able to soften it.
+     * <p>{@link Grounds#SELF} is absent, and since P-5.9 it is absent from
+     * {@link #WRITE_DEVELOPMENT_PLAN} as well - so the two instruments are no longer told apart
+     * by who writes them. What still separates them is that a development goal is
+     * {@link #AGREE_DEVELOPMENT_GOAL agreed} by the employee before it counts, and an
+     * improvement goal never is. A PIP is put <em>to</em> somebody: an employee who could
+     * withhold agreement from it could stall the plan meant to correct their performance, and
+     * one who could edit their own consequence clause could soften it.
      */
     WRITE_IMPROVEMENT_PLAN(Kind.ARTIFACT, "P-5.3", DIRECT_MANAGER),
 

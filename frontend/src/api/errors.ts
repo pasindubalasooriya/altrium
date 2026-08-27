@@ -55,10 +55,12 @@ function classify(status: number, detail: string): ApiFailure {
 }
 
 /**
- * A 404 is treated as `unknown`, not as its own kind, and no screen renders "not found".
- * The backend answers "not permitted" and "not there" identically on purpose; a client that
- * had a distinct not-found screen would eventually be shown one where the server had meant
- * the other, and the difference is exactly the signal the backend refuses to give.
+ * A 404 is treated as `unknown` and stays one, because a not-found screen must never stand in
+ * for a denial: the backend answers "not permitted" and "not there" identically on purpose,
+ * and a client that had a general not-found screen would eventually show it where the server
+ * had meant the other.
+ *
+ * {@link isNotFound} is the one narrow exception, and it is narrow on purpose. See its note.
  */
 export function isForbidden(error: unknown): boolean {
   return error instanceof ApiError && error.kind === 'forbidden'
@@ -85,4 +87,20 @@ export function writeMessage(error: unknown): string | null {
     default:
       return 'Something went wrong. Try again.'
   }
+}
+
+/**
+ * A 404, for the handful of screens where it cannot be a denial in disguise.
+ *
+ * **Use this only where the subject is the caller themselves.** `readRecord` makes its access
+ * decision first and looks for the record second, so a 404 is reachable only by somebody
+ * already permitted to see that person (P-0.5). Where the caller is asking about themselves
+ * the decision is never in doubt, which leaves exactly one meaning: they are not under review
+ * in this cycle. Nothing is disclosed by saying so - it is their own participation.
+ *
+ * On any screen pointed at somebody else this would be a leak waiting to happen, which is why
+ * it is a named helper with this note attached rather than a status check inline.
+ */
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404
 }

@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -88,7 +89,7 @@ public class PlanService {
     // ================================================================= reading
 
     /** The caller's own plan. Takes no id, so it cannot be pointed at anybody else. */
-    public <T> T myPlan(Function<DevelopmentPlan, T> mapper) {
+    public <T> T myPlan(BiFunction<DevelopmentPlan, List<PlanGoal>, T> mapper) {
         return readPlan(currentUser.require().id(), mapper);
     }
 
@@ -99,15 +100,29 @@ public class PlanService {
      * manager asking about a report who has never opened the app gets an empty plan rather than
      * a 404, because the employee does have one - nobody had written it down.
      */
-    public <T> T readPlan(Long userId, Function<DevelopmentPlan, T> mapper) {
+    public <T> T readPlan(Long userId, BiFunction<DevelopmentPlan, List<PlanGoal>, T> mapper) {
         ReviewSubject subject = authorization.subject(userId);
         authorization.require(Capability.READ_DEVELOPMENT_PLAN, subject);
-        return mapper.apply(planFor(userId));
+
+        DevelopmentPlan plan = planFor(userId);
+
+        // A draft goal is the manager's unfinished thought about this person, and it is not on
+        // their plan until it is submitted (P-5.9). Everyone else reading the plan - the
+        // manager who is writing it, HR-in-scope - sees the drafts, because somebody has to be
+        // able to see what they are working on.
+        boolean callerIsSubject = currentUser.require().id().equals(userId);
+        List<PlanGoal> visible = goals.findForPlan(plan.getId(), !callerIsSubject);
+
+        return mapper.apply(plan, visible);
     }
 
     // ================================================================= writing
 
-    /** Adds a goal. Written by the employee or their manager; never by HR (P-5.1). */
+    /**
+     * Drafts a goal (P-5.9). The manager alone; never the employee, and never HR.
+     *
+     * <p>It starts as a draft and is invisible to the employee until {@link #submitGoal}.
+     */
     public <T> T addGoal(Long userId, String title, String detail, LocalDate targetDate,
                          Function<PlanGoal, T> mapper) {
 
@@ -122,16 +137,30 @@ public class PlanService {
     }
 
     /**
-     * Edits a goal's text. The employee's route for reporting progress.
+     * Rewords a goal while it is still the manager's to reword.
+     *
+     * <p>No longer the employee's route for reporting progress - that is
+     * {@link #reportProgress}, which writes to a field of its own. Under P-5.9 this is the
+     * manager's, and only until the employee agrees.
      *
      * <p>The target date is deliberately not editable here. It moves through {@link
      * #moveTargetDate}, under a different capability, because P-5.5 gives the dates to
-     * {@code mgr(S)}.
+     * {@code mgr(S)} - and unlike the wording, it keeps moving after agreement.
      */
     public <T> T editGoal(Long goalId, String title, String detail, Function<PlanGoal, T> mapper) {
         PlanGoal goal = requireGoal(goalId);
         authorization.require(writeCapabilityFor(goal), subjectOf(goal));
         requireTitle(title);
+
+        if (goal.isAgreed()) {
+            // 409: the manager holds the capability throughout, and it is the agreement that
+            // forbids the write. An agreed goal whose wording could still be changed is not one
+            // that was agreed to - the employee would have accepted one thing and be held to
+            // another, with nothing on the record showing it had moved.
+            throw new ConflictApiException(
+                    "That goal has been agreed and its wording is fixed. Add a new goal instead,"
+                            + " or move its target date.");
+        }
 
         if (goal.isComplete()) {
             // 409: the caller holds the permission, and it is the approved record that
@@ -211,7 +240,80 @@ public class PlanService {
         return mapper.apply(goal);
     }
 
-    /** Removes a goal that should not have been there. The employee or their manager. */
+    /**
+     * Submits a drafted goal to the employee (P-5.9).
+     *
+     * <p>Until this happens the goal is not on their plan at all. Submitting is what asks them
+     * to accept it, so it is the manager's and nobody else's.
+     */
+    public <T> T submitGoal(Long goalId, Function<PlanGoal, T> mapper) {
+        PlanGoal goal = requireDevelopmentGoal(goalId, "submitted");
+        authorization.require(Capability.WRITE_DEVELOPMENT_PLAN, subjectOf(goal));
+
+        if (!goal.isDraft()) {
+            throw new ConflictApiException("That goal has already been submitted");
+        }
+        if (goal.getTitle() == null || goal.getTitle().isBlank()) {
+            throw new ValidationApiException("A goal cannot be submitted without a title");
+        }
+
+        goal.submit();
+        return mapper.apply(goal);
+    }
+
+    /**
+     * The employee agreeing to a goal their manager submitted (P-5.9).
+     *
+     * <p>{@code AGREE_DEVELOPMENT_GOAL} carries {@code SELF} alone, so this is the one thing in
+     * the plan machinery nobody can do on somebody else's behalf.
+     *
+     * <p>There is no matching "decline". An un-agreed goal simply stays pending, visibly, which
+     * is the signal that a conversation is owed - and a refusal recorded in the system would be
+     * a disagreement with a manager written into the employee's own development record.
+     */
+    public <T> T agreeGoal(Long goalId, Function<PlanGoal, T> mapper) {
+        PlanGoal goal = requireDevelopmentGoal(goalId, "agreed");
+        authorization.require(Capability.AGREE_DEVELOPMENT_GOAL, subjectOf(goal));
+
+        if (goal.isDraft()) {
+            // Unreachable through the API, because a draft is invisible to the employee. Kept
+            // so that an id lifted from somewhere else cannot agree a goal into existence.
+            throw new ConflictApiException("That goal has not been submitted yet");
+        }
+        if (goal.isAgreed()) {
+            throw new ConflictApiException("You have already agreed to that goal");
+        }
+
+        goal.agree();
+        return mapper.apply(goal);
+    }
+
+    /**
+     * Recording how an agreed goal is going (P-5.9).
+     *
+     * <p>Writes {@code progressNote} and never the goal's wording, which is what keeps
+     * reporting progress from quietly restating the goal. Held by the employee and their
+     * manager: section 8 asks for progress to be tracked and updated without saying by whom,
+     * and a manager writing it up after a conversation is as ordinary as the employee typing it.
+     */
+    public <T> T reportProgress(Long goalId, String note, Function<PlanGoal, T> mapper) {
+        PlanGoal goal = requireDevelopmentGoal(goalId, "updated");
+        authorization.require(Capability.REPORT_GOAL_PROGRESS, subjectOf(goal));
+
+        if (!goal.isAgreed()) {
+            throw new ConflictApiException(
+                    "Progress can be recorded once the goal has been agreed");
+        }
+        if (goal.isComplete()) {
+            throw new ConflictApiException(
+                    "That goal was approved as complete; reopen it before recording more progress");
+        }
+
+        goal.setProgressNote(note);
+        return mapper.apply(goal);
+    }
+
+    /** Removes a goal that should not have been there. The manager (P-5.9). */
     public void removeGoal(Long goalId) {
         PlanGoal goal = requireGoal(goalId);
         authorization.require(writeCapabilityFor(goal), subjectOf(goal));
@@ -573,6 +675,23 @@ public class PlanService {
      * improvement goal is put to them, and they hold nothing. Approval is {@code APPROVE_GOAL}
      * for both, because P-5.2 gives it to {@code mgr(S)} on either plan in the same breath.
      */
+    /**
+     * A development goal, refusing an improvement goal by the same id.
+     *
+     * <p>The agreement lifecycle belongs to development goals alone. Reaching one of these
+     * operations with a PIP goal's id is a 403 rather than a 400, for the same reason every
+     * unknown id is: "no such goal" and "not that kind of goal" must not be distinguishable by
+     * probing, and a PIP is the last thing that should be discoverable that way.
+     */
+    private PlanGoal requireDevelopmentGoal(Long goalId, String verb) {
+        PlanGoal goal = requireGoal(goalId);
+        if (goal.isImprovementGoal()) {
+            throw new AccessDeniedApiException(
+                    "An improvement goal is not " + verb + " by the employee (P-5.9)");
+        }
+        return goal;
+    }
+
     private static Capability writeCapabilityFor(PlanGoal goal) {
         return goal.isImprovementGoal()
                 ? Capability.WRITE_IMPROVEMENT_PLAN

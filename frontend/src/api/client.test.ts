@@ -1,5 +1,5 @@
 ﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, installTokenProvider } from './client'
+import { api, installTokenProvider, resetTokenProviderForTest } from './client'
 import { ApiError } from './errors'
 
 /**
@@ -138,5 +138,61 @@ describe('api client', () => {
     await api.get('/api/reviews', { cycleId: 4, departmentId: undefined })
 
     expect(fetchMock.mock.calls[0][0]).not.toContain('departmentId')
+  })
+
+  /**
+   * The bug these two lock down reached a user. Getting the token used to happen inside the
+   * try that guards fetch, so an expired session - the SDK rejecting because there is nothing
+   * left to refresh - surfaced as "could not reach the Altrium API. Is the backend running?".
+   * The backend was running. A token lasts an hour, so this was the common case, and it sent
+   * people to check a server instead of signing in.
+   */
+  it('reports an expired session as unauthenticated, not as an unreachable API', async () => {
+    installTokenProvider(async () => {
+      throw new Error('no refresh token left')
+    })
+
+    const error = await failure(api.get('/api/me'))
+
+    expect(error.kind).toBe('unauthenticated')
+    expect(error.status).toBe(401)
+    // The request must never have been attempted: there was no credential to attempt it with.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  /**
+   * The race that produced "your session has ended" on every refresh while the session was
+   * healthy. The provider used to be installed from an effect in the component wrapping the
+   * whole app, and React runs effects child-first - so every screen below it mounted, fired a
+   * query, and found no provider. The client threw, and the throw was classified as an ended
+   * session, which sent people to sign in again over and over.
+   *
+   * The client now waits for the provider rather than throwing, so the order stops mattering.
+   */
+  it('waits for a token provider installed after the request has already started', async () => {
+    resetTokenProviderForTest()
+    respond(200, { id: 7 })
+
+    // The request starts first, exactly as a screen's query does on mount.
+    const inFlight = api.get<{ id: number }>('/api/me')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    // The provider arrives afterwards, as the wrapper's effect used to.
+    installTokenProvider(async () => 'late-token')
+
+    await expect(inFlight).resolves.toEqual({ id: 7 })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.headers.Authorization).toBe('Bearer late-token')
+  })
+
+  it('still reports a genuinely unreachable API as unreachable', async () => {
+    // The token is fine here; it is the network that is not. The two must stay distinguishable,
+    // because only one of them is the person's own to act on.
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    const error = await failure(api.get('/api/me'))
+
+    expect(error.status).toBe(0)
+    expect(error.kind).toBe('unknown')
   })
 })

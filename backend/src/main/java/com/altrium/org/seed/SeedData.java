@@ -45,15 +45,22 @@ public class SeedData implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(SeedData.class);
 
     /**
-     * The five people with real Asgardeo accounts, who can actually log in through the UI.
-     * The rest carry synthetic subjects - creating 30 real accounts by hand would be console
-     * work for no testing gain, and nothing below the login screen can tell the difference.
+     * The people with real Asgardeo accounts, who can actually log in through the UI. The rest
+     * carry synthetic subjects - creating 30 real accounts by hand would be console work for no
+     * testing gain, and nothing below the login screen can tell the difference.
+     *
+     * <p>A real account is useless until its subject is recorded here as well. Identity is
+     * matched on {@code asgardeo_subject} and never on the email address, so an account created
+     * in the console alone authenticates perfectly and then meets "your account is not set up
+     * in Altrium" - the token is valid and names nobody this system knows.
      */
     private static final String SUB_JOHN = "cdb99960-4f43-4892-81ac-92f46d8ee260";
     private static final String SUB_JANE = "626a2c84-f344-426b-a369-68645cabcf5c";
     private static final String SUB_KEVIN = "4ac3f0d9-3af4-4b0c-a4da-369b683f7ea1";
     private static final String SUB_RICHARD = "9eebabd1-064e-4e06-8e39-cf9be834f4b1";
     private static final String SUB_DEVIN = "f891d297-d2c7-4161-9650-ff00cdfc1cae";
+    private static final String SUB_AISHA = "03b015cb-179b-44ed-904c-8d53f5db902a";
+    private static final String SUB_DIEGO = "d93fb3c8-b623-4064-b815-87dac7b7cf97";
 
     private final OrgService org;
     private final AppUserRepository users;
@@ -108,8 +115,8 @@ public class SeedData implements ApplicationRunner {
         person("tom", null, "Tom Byrne", engineering, "elena", Role.MANAGER);
 
         person("john", SUB_JOHN, "John Alvarez", engineering, "jane");
-        person("aisha", null, "Aisha Khan", engineering, "jane");
-        person("diego", null, "Diego Santos", engineering, "jane");
+        person("aisha", SUB_AISHA, "Aisha Khan", engineering, "jane");
+        person("diego", SUB_DIEGO, "Diego Santos", engineering, "jane");
         person("mei", null, "Mei Lin", engineering, "jane");
 
         person("omar", null, "Omar Haddad", engineering, "tom");

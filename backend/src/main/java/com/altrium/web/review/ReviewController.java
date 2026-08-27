@@ -64,7 +64,9 @@ public class ReviewController {
     @Operation(summary = "One reviewee's record, assembled per section from the caller's grounds")
     public ReviewDtos.ReviewRecordView record(@PathVariable Long subjectId,
                                               @RequestParam Long cycleId) {
-        return ReviewDtos.ReviewRecordView.of(reviews.readRecord(cycleId, subjectId));
+        // The mapper goes in, like the list above. Mapping out here touches the participant's
+        // lazy cycle proxy on a closed session.
+        return reviews.readRecord(cycleId, subjectId, ReviewDtos.ReviewRecordView::of);
     }
 
     /**

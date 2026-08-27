@@ -58,6 +58,28 @@ describe('MyReviews', () => {
     })
   }
 
+  /** The server's answer for somebody who is not in this cycle's cohort. */
+  function serveNotAParticipant() {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/me')) {
+        return new Response(JSON.stringify(me), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.includes('/api/reviews/cycles')) {
+        return new Response(JSON.stringify(cycles), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(
+        JSON.stringify({ title: 'Not Found', detail: 'No review for this person in this cycle' }),
+        { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
+      )
+    })
+  }
+
   function renderPage() {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     return render(
@@ -150,5 +172,19 @@ describe('MyReviews', () => {
     expect(screen.queryByText('Very thorough')).not.toBeInTheDocument()
     // And no count either: knowing two peers exist is knowing something about them.
     expect(screen.queryByText(/peer/i)).not.toBeInTheDocument()
+  })
+
+  it('says you are not in this cycle rather than reporting a failure', async () => {
+    serveNotAParticipant()
+    renderPage()
+
+    // Jane manages three people and is reviewed in a different quadrimester from all of them,
+    // so this is her ordinary view of the open cycle. It rendered as "Something went wrong
+    // loading this", which sends a manager looking for a server that is fine.
+    await waitFor(() => {
+      expect(screen.getByText(/not under review in the cycle/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/do not have access/i)).not.toBeInTheDocument()
   })
 })

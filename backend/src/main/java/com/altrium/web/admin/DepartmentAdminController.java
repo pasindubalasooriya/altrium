@@ -46,11 +46,11 @@ public class DepartmentAdminController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public DepartmentView create(@Valid @RequestBody DepartmentRequest request) {
-        return DepartmentView.of(org.createDepartment(request.name()));
+        return org.createDepartment(request.name(), DepartmentView::of);
     }
 
     @PutMapping("/{id}")
     public DepartmentView rename(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
-        return DepartmentView.of(org.renameDepartment(id, request.name()));
+        return org.renameDepartment(id, request.name(), DepartmentView::of);
     }
 }
