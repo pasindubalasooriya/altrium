@@ -1,0 +1,49 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /var/www/altrium;
+    index index.html;
+
+    client_max_body_size 2m;
+
+    # Serving the SPA and proxying the API from one server block makes the deployment
+    # same-origin, so the backend's CORS configuration never comes into play and only
+    # port 80 is open. In development they are two origins on purpose, which is what
+    # keeps the CORS path honest.
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Swagger and the OpenAPI document are permitAll in SecurityConfig, which is right for
+    # development and wrong on a public host: it hands a stranger the whole endpoint list.
+    # Refused here rather than in code, so local development keeps them.
+    location ~ ^/(swagger-ui|v3/api-docs) {
+        return 404;
+    }
+    location = /swagger-ui.html {
+        return 404;
+    }
+
+    # Hashed assets are immutable; index.html must never be cached or a deploy is invisible
+    # until the browser is persuaded to look again.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    # Client-side routing: every unknown path is a React route, not a 404.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

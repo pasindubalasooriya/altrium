@@ -1,0 +1,27 @@
+[Unit]
+Description=Altrium backend
+After=network-online.target mysql.service
+Wants=network-online.target
+Requires=mysql.service
+
+[Service]
+User=altrium
+Group=altrium
+EnvironmentFile=/etc/altrium/altrium.env
+WorkingDirectory=/opt/altrium
+
+# Sized for a 1 GB instance sharing the box with MySQL. The heap cap is the point: without
+# it the JVM claims a quarter of the machine and MySQL is what gets killed.
+ExecStart=/usr/bin/java -Xmx350m -Xss512k -XX:MaxMetaspaceSize=180m -XX:+UseSerialGC -jar /opt/altrium/altrium.jar
+
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
