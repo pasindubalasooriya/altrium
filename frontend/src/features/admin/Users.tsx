@@ -11,6 +11,7 @@ import { Pager, usePaging } from '../../components/Pager'
 import { EmptyState, Loading, QueryFailure } from '../../components/States'
 import type { Role } from '../../api/types'
 import { AdminNav } from './AdminNav'
+import { ManagerPicker } from './ManagerPicker'
 
 const ROLES: Role[] = ['EMPLOYEE', 'MANAGER', 'HR', 'LEADERSHIP', 'SUPER_ADMIN']
 
@@ -348,7 +349,10 @@ function EditUser({ user, onDone }: { user: AdminUser; onDone: () => void }) {
     departmentId: user.departmentId ? String(user.departmentId) : '',
     roles: user.roles,
   })
-  const [managerId, setManagerId] = useState(user.managerId ? String(user.managerId) : '')
+  const [manager, setManager] = useState<{ id: number | null; name: string | null }>({
+    id: user.managerId,
+    name: user.managerName,
+  })
   const saving = actions.update.isPending || actions.setManager.isPending
 
   return (
@@ -379,19 +383,35 @@ function EditUser({ user, onDone }: { user: AdminUser; onDone: () => void }) {
             ))}
           </Select>
         </Field>
+      </div>
+
+      {/*
+        Out of the two-column grid on purpose: the picker is a search box over a list, and
+        pairing it with a single-line input would leave whichever column it sat in stretched to
+        its height with the other half empty.
+      */}
+      <div className="mt-3">
         <Field
           label="Reports to"
-          hint="A person's id. Leave empty to detach them, which is how the top of the chain is set."
+          hint="People this person manages, directly or further down, are not offered - that would be a loop."
         >
-          <TextInput value={managerId} onChange={(e) => setManagerId(e.target.value)} />
+          <ManagerPicker
+            userId={user.id}
+            value={manager.id}
+            valueName={manager.name}
+            onChange={(id, name) => setManager({ id, name })}
+          />
         </Field>
       </div>
 
       <RolePicker roles={form.roles} onChange={(roles) => setForm({ ...form, roles })} />
 
       {/*
-        A reporting loop is rejected by the server with 400 and arrives here as a message on
-        the form. The check walks the whole chain, which no client-side guess could do.
+        The loop rejection is a 400 and would render here, but through this console it should
+        no longer be reachable: the candidate list carries the same exclusions the write does,
+        so a choice that would close a loop is never offered. What does still land here is the
+        race the list cannot pre-empt - somebody deactivated between this panel opening and the
+        save - along with any 400 from the fields above.
       */}
       <WriteFailure error={actions.update.error ?? actions.setManager.error} />
 
@@ -418,7 +438,7 @@ function EditUser({ user, onDone }: { user: AdminUser; onDone: () => void }) {
                 })
                 await actions.setManager.mutateAsync({
                   id: user.id,
-                  managerId: managerId ? Number(managerId) : null,
+                  managerId: manager.id,
                 })
                 onDone()
               } catch {

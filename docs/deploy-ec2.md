@@ -165,10 +165,17 @@ scp -i altrium-demo.pem altrium/backend/target/altrium-backend-0.1.0-SNAPSHOT.ja
 
 ssh -i altrium-demo.pem ubuntu@35.173.168.105 '
   sudo install -o altrium -g altrium -m 644 /tmp/altrium-backend-0.1.0-SNAPSHOT.jar /opt/altrium/altrium.jar
+  sudo rm -rf /var/www/altrium/assets
   sudo tar xzf /tmp/dist.tgz -C /var/www/altrium
   sudo chown -R www-data:www-data /var/www/altrium
   sudo systemctl restart altrium'
 ```
+
+The `rm -rf` on `assets` is not tidiness. Bundle filenames carry a content hash, so `tar` adds
+the new ones beside the old rather than replacing them, and every past deploy stays on disk
+being served `immutable` forever. On an 8 GB volume that is a slow leak; more to the point, it
+leaves earlier versions of the application publicly reachable at their old URLs. `index.html`
+is overwritten in place and is the only file that names the current bundle.
 
 ### Redeploying a code change
 

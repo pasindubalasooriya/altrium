@@ -43,6 +43,8 @@ export interface UserFilters {
   role?: Role
   /** False for people not in any cohort, true for those already placed. A SQL predicate. */
   inCohort?: boolean
+  /** Narrows the page to people who could be assigned as this user's manager. */
+  managerCandidateFor?: number
 }
 
 export function useUsers(filters: UserFilters, page: number, size = 25) {
@@ -55,10 +57,27 @@ export function useUsers(filters: UserFilters, page: number, size = 25) {
         active: filters.active,
         role: filters.role,
         inCohort: filters.inCohort,
+        managerCandidateFor: filters.managerCandidateFor,
         page,
         size,
       }),
   })
+}
+
+/**
+ * Who could be this person's manager, searched and paged on the server.
+ *
+ * The exclusions - the person themselves, everybody beneath them in the chart, anybody
+ * deactivated, the Super Admin - are applied in the query. The client does not re-apply them:
+ * the rule is the server's, and a client filter that drifted would hide a real disagreement
+ * rather than surface it.
+ *
+ * `userId` is required rather than optional on purpose. Passing undefined would drop the
+ * parameter and quietly fetch the whole directory instead of a candidate list, which is a
+ * failure that looks like a working picker. A caller without an id is a type error here.
+ */
+export function useManagerCandidates(userId: number, search: string) {
+  return useUsers({ managerCandidateFor: userId, search }, 0, 10)
 }
 
 export function useDirectReports(userId: number | undefined) {

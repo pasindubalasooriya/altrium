@@ -55,6 +55,14 @@ public class UserAdminController {
         this.org = org;
     }
 
+    /**
+     * A page of users, every filter applied in SQL.
+     *
+     * <p>{@code managerCandidateFor} answers "who could be this person's manager" and feeds the
+     * reporting-line picker. It is a filter on this endpoint rather than an endpoint of its
+     * own, for the same reason {@code inCohort} is: the roster, the gate and the response shape
+     * are all identical, and a second endpoint would be a second place for them to drift.
+     */
     @GetMapping
     @Operation(summary = "A page of users, filtered in SQL")
     public PageView<UserView> list(
@@ -63,12 +71,14 @@ public class UserAdminController {
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) Role role,
             @RequestParam(required = false) Boolean inCohort,
+            @RequestParam(required = false) Long managerCandidateFor,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
 
         // The mapper is handed to the service so conversion happens inside its transaction.
         // Mapping entities out here would touch lazy proxies on a closed session.
         Page<UserView> result = org.listUsers(search, departmentId, active, role, inCohort,
+                managerCandidateFor,
                 PageRequest.of(Math.max(page, 0),
                         Math.clamp(size, 1, MAX_PAGE_SIZE),
                         Sort.by("fullName").ascending()),

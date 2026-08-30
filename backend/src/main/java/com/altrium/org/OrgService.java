@@ -168,10 +168,22 @@ public class OrgService {
      * lazy proxies belonging to a closed session - which fails only outside a transaction,
      * meaning tests that wrap themselves in one would never see it.
      */
+    /**
+     * @param managerCandidateFor when set, narrows the page to people who could be assigned as
+     *                            <em>that</em> user's manager. See {@link #loopFormingSet}.
+     */
     @Transactional(readOnly = true)
     public <T> Page<T> listUsers(String search, Long departmentId, Boolean active, Role role,
-                                 Boolean inCohort, Pageable pageable, Function<AppUser, T> mapper) {
-        return users.findAll(userFilter(search, departmentId, active, role, inCohort), pageable)
+                                 Boolean inCohort, Long managerCandidateFor, Pageable pageable,
+                                 Function<AppUser, T> mapper) {
+
+        Set<Long> loopForming = managerCandidateFor == null
+                ? null
+                : loopFormingSet(requireUser(managerCandidateFor).getId());
+
+        return users.findAll(
+                        userFilter(search, departmentId, active, role, inCohort, loopForming),
+                        pageable)
                 .map(mapper);
     }
 
@@ -194,8 +206,53 @@ public class OrgService {
 
     // ---------------------------------------------------------------- internals
 
+    /**
+     * The people who cannot be offered as a manager for {@code userId} without creating a loop
+     * (P-1.4): the user themselves, and everybody beneath them in the reporting tree.
+     *
+     * <p>This is {@link #assignManager}'s check read from the other end. That one walks
+     * <em>up</em> from a proposed manager and refuses if it arrives back at the user; this
+     * walks <em>down</em> from the user and refuses to offer anyone it reaches. Same rule, and
+     * they have to stay the same rule - a candidate list assembled from a different one would
+     * offer a choice the write then rejects.
+     *
+     * <p>One query per level rather than one per person, which is what the batched
+     * {@link AppUserRepository#findIdsByManagerIdIn} exists for. The visited set carries the
+     * same job it does in {@code assignManager}: pre-existing corruption in the chart must
+     * terminate the walk rather than spin.
+     *
+     * <p>The returned set always contains {@code userId}, so it is never empty. That is not
+     * incidental - {@code IN ()} on an empty collection is not valid SQL, and a caller that
+     * built the predicate from an empty set would generate something Hibernate has to special
+     * case.
+     */
+    private Set<Long> loopFormingSet(Long userId) {
+        Set<Long> reached = new HashSet<>();
+        reached.add(userId);
+
+        List<Long> level = List.of(userId);
+        int depth = 0;
+
+        while (!level.isEmpty()) {
+            if (++depth > MAX_CHAIN_DEPTH) {
+                throw new ValidationApiException(
+                        "The reporting chart is implausibly deep; fix it before assigning");
+            }
+            // Only the ids not already reached go into the next round, so a chart that already
+            // contains a cycle drains rather than revisiting the same rows forever.
+            level = users.findIdsByManagerIdIn(level).stream()
+                    .filter(reached::add)
+                    .toList();
+        }
+        return reached;
+    }
+
+    /**
+     * @param loopForming when non-null, the page is narrowed to manager candidates and this is
+     *                    the set they may not come from
+     */
     private Specification<AppUser> userFilter(String search, Long departmentId, Boolean active,
-                                              Role role, Boolean inCohort) {
+                                              Role role, Boolean inCohort, Set<Long> loopForming) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (search != null && !search.isBlank()) {
@@ -234,6 +291,25 @@ public class OrgService {
                 membership.select(cb.literal(1L))
                         .where(cb.equal(member.get("user").get("id"), root.get("id")));
                 predicates.add(inCohort ? cb.exists(membership) : cb.not(cb.exists(membership)));
+            }
+            if (loopForming != null) {
+                // "Who could be this person's manager", for the reporting-line picker. Every
+                // refusal assignManager makes is carried here so the list offered and the set
+                // the write accepts are one set - a list built from a different rule would
+                // offer a choice the server then rejects, which reads as a bug rather than as
+                // the rule it is.
+                predicates.add(cb.not(root.get("id").in(loopForming)));
+                predicates.add(cb.isTrue(root.get("active")));
+
+                // The one exception to the paragraph above, and it is deliberate rather than an
+                // oversight: assignManager still accepts the Super Admin, so here the list is
+                // narrower than the write. Offering Devin would be offering a mistake - a Super
+                // Admin holding a reporting line gains DIRECT_MANAGER grounds and with them
+                // WRITE_MANAGER_REVIEW, which is exactly the review access P-9.4 denies the
+                // role. Closing it properly means a refusal in assignManager, a denial test and
+                // a policy line. Until then the console does not offer it and the gap is
+                // recorded rather than hidden.
+                predicates.add(cb.not(cb.isMember(Role.SUPER_ADMIN, root.get("roles"))));
             }
             return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
         };

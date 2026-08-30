@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,6 +76,16 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>,
      */
     @Query("SELECT u.id FROM AppUser u WHERE u.manager.id = :managerId")
     List<Long> findIdsByManagerId(@Param("managerId") Long managerId);
+
+    /**
+     * The same question asked of a whole level at once, which is what lets the reporting tree
+     * be walked downward in one query per level rather than one per person.
+     *
+     * <p>Used only to assemble the set of people who cannot be offered as somebody's manager
+     * (P-1.4). It is a batched {@link #findIdsByManagerId} and nothing more.
+     */
+    @Query("SELECT u.id FROM AppUser u WHERE u.manager.id IN :managerIds")
+    List<Long> findIdsByManagerIdIn(@Param("managerIds") Collection<Long> managerIds);
 
     Optional<AppUser> findByEmail(String email);
 
