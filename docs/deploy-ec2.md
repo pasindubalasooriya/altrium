@@ -304,10 +304,32 @@ frontend tests pass and a build with no environment set still bakes in `localhos
 
 ## Cost, and turning it off
 
-Free tier covers 750 hours a month of `t3.micro` and, for the first 12 months of an account,
-750 hours of public IPv4. Outside that, the address is roughly 3.60 USD a month, and an Elastic
-IP is billed **while the instance is stopped** - so stopping between sessions reduces the bill
-but does not remove it.
+**This account is not on the 12-month free tier**, so the deployment is billed. Checked with
+`aws freetier get-free-tier-usage`, which returned only the always-free items (Glue, KMS) and no
+EC2, EBS or IPv4 allowance, while a `t3.micro` was running. Confirm in Billing and Cost
+Management if it matters.
+
+List prices, `us-east-1`, read from the AWS pricing API:
+
+| Item | Rate | 730 hours |
+|---|---|---|
+| `t3.micro` on demand, Linux | 0.0104 USD/hr | 7.59 |
+| 8 GB gp3 volume | 0.08 USD/GB-month | 0.64 |
+| In-use public IPv4 | 0.005 USD/hr | 3.65 |
+| Data transfer out | first 100 GB/month free | 0.00 |
+| **Total, running continuously** | | **about 11.90 USD/month** |
+
+Egress rounds to nothing: the whole SPA bundle is 1.3 MB, so a thousand cold page loads is
+roughly 1.3 GB against a 100 GB monthly allowance.
+
+**Stopping the instance between demos does not make it free.** The volume is still billed, and
+so is the address - an Elastic IP is charged whether it is attached to a stopped instance or
+detached entirely. Stopped for a whole month with a few hours of demo use, expect roughly
+**4.50 USD**: 3.65 for the address, 0.64 for the volume, and pennies of compute.
+
+Releasing the address is the only way to stop that charge, and it breaks the registered
+Asgardeo redirect URL. Below about six weeks it is cheaper in effort than in dollars to leave it
+allocated.
 
 Full teardown, once the assessment is done:
 
