@@ -208,6 +208,50 @@ it, Jane assigns peers and writes a review, the peers write theirs, Kevin signs 
 Jane shares it. Worth rehearsing once against the instance, because there is no pre-built state
 to fall back on if a step is skipped.
 
+## Plain HTTP breaks ID token validation, and how that is handled
+
+The first login attempt against the deployed host failed in a way worth recording, because
+everything about it looked correct. The HAR showed the full Asgardeo round trip succeeding: a
+302 to `/oauth2/authorize`, the login form, `POST /oauth2/token` returning **200** with a valid
+access token for the right subject, then `GET /oauth2/jwks` returning **200**. And then nothing
+at all - no call to `/api/me`, and the app back on the login screen.
+
+The SDK fetches JWKS for exactly one reason: to verify the ID token signature. It fetched the
+keys and then died on the verify.
+
+`@asgardeo/auth-spa` verifies through `jose`
+(`src/utils/crypto-utils.ts`, `verifyJwt` calling `jwtVerify`), and `jose` verifies through
+**WebCrypto**. `crypto.subtle` is defined **only in a secure context** - HTTPS, or localhost.
+This host is neither, so the call throws and `signIn()` rejects while holding perfectly good
+tokens.
+
+PKCE is unaffected and that is what makes the failure confusing: the same file hashes the code
+challenge with `fast-sha256`, a pure-JS implementation needing no WebCrypto. Everything works
+right up to the last step.
+
+`config.ts` therefore sets `validateIDToken` from whether WebCrypto exists, rather than turning
+it off by hand:
+
+```ts
+const canVerifyTokenSignature = typeof crypto !== 'undefined' && crypto.subtle !== undefined
+```
+
+The check stays on locally and behind any TLS, and turns itself back on the day this is served
+over HTTPS.
+
+**What is given up.** The ID token still arrives over TLS from Asgardeo's token endpoint in
+response to a PKCE exchange this app started, so it is not unauthenticated - the signature check
+is defence in depth against a compromised transport, not the thing keeping anyone out. The
+access control is untouched: the backend validates every access token against Asgardeo's JWKS on
+every request, and a browser cannot grant itself anything by believing a token.
+
+**The real fix is HTTPS**, which also fixes the larger problem this sits inside: on a plain HTTP
+host the bearer token travels to the API in clear text, and anyone on the path can read it. That
+is acceptable for a demo with fictional data on a throwaway instance and would not be acceptable
+for anything else. Moving to TLS means a hostname Let's Encrypt will issue for - an `sslip.io`
+name against the Elastic IP is the cheapest - a certificate, and re-registering the new origin
+in Asgardeo.
+
 ## Swagger is refused here
 
 `/swagger-ui`, `/swagger-ui.html` and `/v3/api-docs` are `permitAll` in `SecurityConfig`, which

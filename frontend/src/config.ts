@@ -21,6 +21,32 @@ import type { AuthReactConfig } from '@asgardeo/auth-react'
 
 const origin = import.meta.env.VITE_APP_ORIGIN ?? 'http://localhost:5173'
 
+/**
+ * Whether this browser can verify the ID token signature at all.
+ *
+ * The Asgardeo SDK verifies through `jose`, and `jose` verifies through WebCrypto. But
+ * `crypto.subtle` is defined **only in a secure context** - HTTPS, or localhost. The demo host
+ * is plain HTTP on an EC2 address, so there the verify throws and `signIn()` rejects *after* a
+ * perfectly good token exchange: the app returns from Asgardeo holding valid tokens and drops
+ * straight back to the login screen. PKCE still works there, because the same SDK hashes the
+ * code challenge with a pure-JS sha256 that needs no WebCrypto - which is why the failure
+ * looks like nothing is wrong right up until the last step.
+ *
+ * So the check is skipped exactly where it cannot run, rather than switched off by hand.
+ * Locally and behind HTTPS it stays on, and it turns itself back on the day this is served
+ * over TLS.
+ *
+ * **What is lost, stated plainly.** The ID token still arrives over TLS from Asgardeo's token
+ * endpoint, in response to a PKCE exchange this app started, so it is not unauthenticated - the
+ * signature check is defence in depth against a compromised transport. And it was never the
+ * access control: the backend validates every access token against Asgardeo's JWKS on every
+ * request, and that is untouched. A browser cannot grant itself anything by believing a token.
+ *
+ * The real fix is HTTPS, which also fixes the larger problem this sits inside: on a plain HTTP
+ * host the bearer token travels to the API in clear text.
+ */
+const canVerifyTokenSignature = typeof crypto !== 'undefined' && crypto.subtle !== undefined
+
 export const config: { asgardeo: AuthReactConfig; apiBaseUrl: string } = {
   asgardeo: {
     clientID: import.meta.env.VITE_ASGARDEO_CLIENT_ID ?? '4fnWPKRrxnUyy4wxULpkw4nOhnoa',
@@ -28,6 +54,7 @@ export const config: { asgardeo: AuthReactConfig; apiBaseUrl: string } = {
     signInRedirectURL: origin,
     signOutRedirectURL: origin,
     scope: ['openid', 'profile', 'roles'],
+    validateIDToken: canVerifyTokenSignature,
   },
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080',
 }
