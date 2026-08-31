@@ -261,6 +261,9 @@ function ManagerReviewForm({
   const save = useSaveManagerReview(subjectId, cycleId)
   const existing = record.managerReview
   const submitted = Boolean(existing?.submittedAt)
+  // As on the self-review: the row exists only once something has been saved, so the save
+  // button can say whether it is keeping a first draft or revising one.
+  const hasDraft = Boolean(existing) && !submitted
   const [feedback, setFeedback] = useState('')
 
   useEffect(() => {
@@ -315,7 +318,7 @@ function ManagerReviewForm({
               busyLabel="Saving"
               onClick={() => save.mutate({ feedback, submit: false })}
             >
-              Save draft
+              {hasDraft ? 'Edit draft' : 'Save draft'}
             </Button>
             <Button
               variant="primary"
@@ -462,13 +465,24 @@ function RatingCard({
           </p>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
+            {/*
+              "Submit for calibration", not "Set rating". Setting the number is not the end of
+              the manager's turn - it hands the rating to HR, who calibrate it or approve it as
+              set, and only then may it be shared (P-4.8). The old label described the database
+              write; this one describes what actually happens next.
+
+              It changes once a rating exists, because at that point the hand-off has already
+              happened and pressing this again only revises the figure while it is still the
+              manager's to revise (P-4.1). Saying "submit" a second time would promise a
+              hand-off that does not repeat.
+            */}
             <Button
               variant="primary"
               busy={set.isPending}
-              busyLabel="Setting"
+              busyLabel={current ? 'Updating' : 'Submitting'}
               onClick={() => set.mutate(rating)}
             >
-              Set rating
+              {current ? 'Update rating' : 'Submit for calibration'}
             </Button>
             {/*
               HR see the peer feedback, your review and the number, then either adjust it or

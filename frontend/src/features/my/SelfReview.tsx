@@ -31,6 +31,12 @@ export function SelfReview() {
   const existing = record?.selfReview
   const submitted = Boolean(existing?.submittedAt)
 
+  // The row exists only once something has been saved, so its presence is what distinguishes
+  // a first save from a revision. The save button says which of the two it is doing: without
+  // it there is nothing on the screen that confirms a draft was ever kept, and people saved
+  // twice to be sure.
+  const hasDraft = Boolean(existing) && !submitted
+
   // Load whatever is already saved when the cycle changes. Keyed on the cycle rather than on
   // the record, so typing is not overwritten by a background refetch mid-sentence.
   useEffect(() => {
@@ -94,7 +100,7 @@ export function SelfReview() {
             {!submitted && (
               <div className="flex items-center gap-3">
                 <Button onClick={() => write(false)} busy={save.isPending} busyLabel="Saving">
-                  Save draft
+                  {hasDraft ? 'Edit draft' : 'Save draft'}
                 </Button>
                 <Button variant="primary" onClick={() => write(true)} busy={save.isPending} busyLabel="Submitting">
                   Submit
