@@ -2,7 +2,10 @@ package com.altrium.testsupport;
 
 import com.altrium.org.AppUser;
 import com.altrium.plan.DevelopmentPlan;
+import com.altrium.plan.GoalAgreement;
+import com.altrium.plan.GoalStatus;
 import com.altrium.plan.ImprovementPlan;
+import com.altrium.plan.PlanGoal;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Component;
 
@@ -64,6 +67,84 @@ public class PlanFixture {
                 .executeUpdate();
         em.refresh(plan);
         return plan;
+    }
+
+    /**
+     * A development goal in a named agreement and status, on the person's own plan.
+     *
+     * <p>Set directly rather than driven through the API, because the reminder tests need every
+     * combination of DRAFT, PENDING and AGREED against one date, and reaching those through the
+     * endpoints would take three calls each and prove something the plan tests already prove.
+     * What is under test here is which of them produces an email.
+     */
+    public PlanGoal developmentGoal(AppUser user, String title, LocalDate targetDate,
+                                    GoalAgreement agreement, GoalStatus status) {
+        DevelopmentPlan plan = em.createQuery(
+                        "SELECT p FROM DevelopmentPlan p WHERE p.user = :user", DevelopmentPlan.class)
+                .setParameter("user", user)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> {
+                    DevelopmentPlan created = new DevelopmentPlan(user);
+                    em.persist(created);
+                    return created;
+                });
+
+        PlanGoal goal = new PlanGoal(plan, title, null, targetDate);
+        em.persist(goal);
+        em.flush();
+
+        em.createNativeQuery("UPDATE plan_goal SET agreement = :a, status = :s WHERE id = :id")
+                .setParameter("a", agreement.name())
+                .setParameter("s", status.name())
+                .setParameter("id", goal.getId())
+                .executeUpdate();
+        em.refresh(goal);
+        return goal;
+    }
+
+    /** An active improvement plan, co-signed or not, with the development plan suspended. */
+    public ImprovementPlan improvementPlan(AppUser subject, AppUser manager, LocalDate deadline,
+                                           boolean cosigned) {
+        suspendedPlan(subject);
+
+        ImprovementPlan plan = new ImprovementPlan(
+                subject, manager, deadline, "Sustained improvement required or role at risk.");
+        em.persist(plan);
+        em.flush();
+
+        if (cosigned) {
+            cosign(plan, manager);
+        }
+        return plan;
+    }
+
+    public PlanGoal improvementGoal(ImprovementPlan plan, String title, LocalDate targetDate) {
+        PlanGoal goal = new PlanGoal(plan, title, null, targetDate);
+        em.persist(goal);
+        em.flush();
+        return goal;
+    }
+
+    /**
+     * Marks a plan co-signed.
+     *
+     * <p>A native update because {@code ImprovementPlan#cosign} is package-private, which is
+     * right: outside its package the only route is {@code PlanService}, and that is what the
+     * improvement-plan tests use. Here the co-signature is a precondition rather than the thing
+     * being tested.
+     */
+    public void cosign(ImprovementPlan plan, AppUser hrUser) {
+        em.createNativeQuery("""
+                        UPDATE improvement_plan
+                        SET cosigned_by = :hr, cosigned_at = CURRENT_TIMESTAMP(6)
+                        WHERE id = :id
+                        """)
+                .setParameter("hr", hrUser.getId())
+                .setParameter("id", plan.getId())
+                .executeUpdate();
+        em.flush();
+        em.refresh(plan);
     }
 
     public void flush() {

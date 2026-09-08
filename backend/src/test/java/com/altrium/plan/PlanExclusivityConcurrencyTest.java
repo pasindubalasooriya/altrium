@@ -6,7 +6,9 @@ import com.altrium.org.AppUser;
 import com.altrium.org.Department;
 import com.altrium.org.Role;
 import com.altrium.testsupport.Acting;
+import com.altrium.review.Rating;
 import com.altrium.testsupport.OrgFixture;
+import com.altrium.testsupport.ReviewFixture;
 import com.altrium.testsupport.StubJwtDecoderConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +59,9 @@ class PlanExclusivityConcurrencyTest {
     private OrgFixture org;
 
     @Autowired
+    private ReviewFixture reviews;
+
+    @Autowired
     private Acting acting;
 
     @Autowired
@@ -67,6 +72,7 @@ class PlanExclusivityConcurrencyTest {
 
     private final List<Long> createdUserIds = new ArrayList<>();
     private Long departmentId;
+    private Long cycleId;
 
     @AfterEach
     void cleanUp() {
@@ -79,6 +85,7 @@ class PlanExclusivityConcurrencyTest {
                 + " (SELECT id FROM improvement_plan WHERE user_id IN (" + ids + "))");
         jdbc.update("DELETE FROM plan_goal WHERE development_plan_id IN"
                 + " (SELECT id FROM development_plan WHERE user_id IN (" + ids + "))");
+        jdbc.update("DELETE FROM final_rating WHERE subject_id IN (" + ids + ")");
         jdbc.update("DELETE FROM improvement_plan WHERE user_id IN (" + ids + ")");
         jdbc.update("DELETE FROM development_plan WHERE user_id IN (" + ids + ")");
         jdbc.update("DELETE FROM user_role WHERE user_id IN (" + ids + ")");
@@ -86,6 +93,10 @@ class PlanExclusivityConcurrencyTest {
         jdbc.update("DELETE FROM app_user WHERE id IN (" + ids + ")");
         if (departmentId != null) {
             jdbc.update("DELETE FROM department WHERE id = ?", departmentId);
+        }
+        if (cycleId != null) {
+            jdbc.update("DELETE FROM review_cycle WHERE id = ?", cycleId);
+            cycleId = null;
         }
         createdUserIds.clear();
     }
@@ -105,8 +116,23 @@ class PlanExclusivityConcurrencyTest {
             departmentId = engineering.getId();
             createdUserIds.add(elena.getId());
             createdUserIds.add(john.getId());
+
             return new People(elena.getId(), john.getId());
         });
+
+        // An improvement plan follows a completed review (scenario section 5 step 7), so John
+        // needs a shared rating before either thread can open one. Written with SQL rather than
+        // the fixture because this class is not @Transactional: org.flush() has already
+        // detached the entities above, and a detached subject handed to a new FinalRating does
+        // not reliably reach the database. The race is what this test is about; the review is
+        // scaffolding, and scaffolding should be the boring part.
+        jdbc.update("INSERT INTO review_cycle (financial_year, quadrimester_no, status,"
+                + " start_date, end_date, opened_at) VALUES (?, ?, 'OPEN', ?, ?, NOW(6))",
+                2099, 1, LocalDate.of(2099, 1, 1), LocalDate.of(2099, 4, 30));
+        cycleId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        jdbc.update("INSERT INTO final_rating (cycle_id, subject_id, rating, set_by, released_at)"
+                + " VALUES (?, ?, 'NEEDS_IMPROVEMENT', ?, NOW(6))",
+                cycleId, people.subjectId(), people.managerId());
 
         int attempts = 2;
         CountDownLatch ready = new CountDownLatch(attempts);

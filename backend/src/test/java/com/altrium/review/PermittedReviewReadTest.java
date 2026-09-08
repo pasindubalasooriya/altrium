@@ -492,4 +492,69 @@ class PermittedReviewReadTest {
                 .andExpect(jsonPath("$.content[0].peerReviewsSubmitted").doesNotExist());
 
     }
+
+    /**
+     * The manager's team screen asks for this. A manager who is themselves under review was
+     * appearing among their own reports, because {@code SELF} is a ground on the review summary
+     * and the list carries every ground the caller holds at once.
+     *
+     * <p>The count is the assertion that matters. Dropping the row in the client would leave
+     * {@code totalElements} at three while three rows rendered, and the pager would be wrong
+     * for exactly as long as nobody counted.
+     */
+    @Test
+    @DisplayName("excludeSelf removes the caller's own row from the query, not from the page")
+    void excludeSelfIsAppliedInTheQuery() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-xs", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-xs", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha-xs", Role.EMPLOYEE);
+        john.setManager(elena);
+        aisha.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, elena);
+        reviews.participant(cycle, john);
+        reviews.participant(cycle, aisha);
+        reviews.flush();
+
+        // Elena is in the cycle herself, so without the flag she is one of the three rows.
+        mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena-xs")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.content[*].subjectId", hasItem(elena.getId().intValue())));
+
+        mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
+                        .param("excludeSelf", "true")
+                        .header("Authorization", bearer("elena-xs")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].subjectId", not(hasItem(elena.getId().intValue()))));
+    }
+
+    /**
+     * The flag narrows and can never widen. An employee who holds only {@code SELF} asks with
+     * it set and gets nothing - not somebody else's row.
+     */
+    @Test
+    @DisplayName("excludeSelf cannot be used to reach rows the caller has no grounds for")
+    void excludeSelfOnlyEverNarrows() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser john = org.userIn(engineering, "john-narrow", Role.EMPLOYEE);
+        AppUser aisha = org.userIn(engineering, "aisha-narrow", Role.EMPLOYEE);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.participant(cycle, aisha);
+        reviews.flush();
+
+        mvc.perform(get(REVIEWS).param("cycleId", cycle.getId().toString())
+                        .param("excludeSelf", "true")
+                        .header("Authorization", bearer("john-narrow")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
 }

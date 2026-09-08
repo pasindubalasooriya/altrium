@@ -48,6 +48,60 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# Email deadline reminders (feature 17, scenario section 13).
+altrium:
+  # Where the link in a reminder points. Not derived from a request, because the sweep has no
+  # request: it runs as the system at seven in the morning with nobody signed in.
+  app-url: ${ALTRIUM_APP_URL:http://localhost:5173}
+
+  # Google Calendar scheduling (feature 20, scenario section 12).
+  #
+  # Altrium has no Google Workspace, so there is no service account and no domain-wide
+  # delegation here. These are the credentials of one OAuth *client*, which is what lets a
+  # person consent; the calendar access itself belongs to whoever clicked Connect.
+  google:
+    # Public identifiers and secrets kept apart on purpose. The client id appears in a URL the
+    # browser visits and is not a credential; the secret is, and is never sent to a browser.
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+    client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+
+    # Absent by default, which disables the whole integration rather than half of it: with no
+    # secret the token cipher holds no key, so a token could not be stored safely and the
+    # connect endpoint refuses before the flow starts.
+
+    # Must match a redirect URI registered in the Google Cloud console, character for
+    # character. Google permits plain http only for localhost, so any deployed host needs
+    # https here and TLS in front of it.
+    redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/integrations/google/callback}
+
+  # When a meeting may be proposed. Not a hardcoded organisational fact: a client in another
+  # timezone, or one that starts at eight, changes these and nothing else.
+  meetings:
+    zone: ${ALTRIUM_MEETING_ZONE:Europe/London}
+    day-start: ${ALTRIUM_MEETING_DAY_START:09:00}
+    day-end: ${ALTRIUM_MEETING_DAY_END:17:00}
+
+  reminders:
+    # Absent by default, and that is the switch between the two senders. With no key the sweep
+    # still runs, still applies every suppression rule and still writes every log row, and
+    # prints instead of sending. Set it and the same run sends for real.
+    api-key: ${RESEND_API_KEY:}
+
+    from: ${ALTRIUM_REMINDER_FROM:Altrium <onboarding@resend.dev>}
+
+    # Non-production only. Every reminder goes here instead of the person's own address, with
+    # the real recipient named in the subject line. Blank means normal delivery, so the default
+    # is the production behaviour and only a deliberate setting diverts anything.
+    redirect-to: ${ALTRIUM_REMINDER_REDIRECT_TO:}
+
+    # How many days ahead of a deadline to remind, as exact offsets rather than a window. A
+    # window would remind daily about anything overdue, and a reminder that arrives every day is
+    # one people filter away along with the useful ones.
+    days-before: ${ALTRIUM_REMINDER_DAYS:7,3,1,0}
+
+    enabled: ${ALTRIUM_REMINDERS_ENABLED:true}
+    cron: ${ALTRIUM_REMINDER_CRON:0 0 7 * * *}
+
 logging:
   level:
     com.altrium: INFO

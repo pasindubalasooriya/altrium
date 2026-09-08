@@ -210,8 +210,11 @@ public class ImprovementPlanController {
     @GetMapping("/me")
     @Operation(summary = "Your own improvement plan, once co-signed (P-5.3)")
     public OwnImprovementPlanView myPlan() {
-        return plans.myImprovementPlan()
-                .map(plan -> new OwnImprovementPlanView(true, ImprovementPlanView.of(plan)))
+        // The mapper goes into the service so the conversion happens inside its transaction.
+        // Converting out here read the subject's and the opener's names off lazy proxies on a
+        // closed session, which is a 500 rather than a denial.
+        return plans.myImprovementPlan(ImprovementPlanView::of)
+                .map(view -> new OwnImprovementPlanView(true, view))
                 .orElseGet(() -> new OwnImprovementPlanView(false, null));
     }
 

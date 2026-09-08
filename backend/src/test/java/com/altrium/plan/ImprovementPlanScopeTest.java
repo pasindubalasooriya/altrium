@@ -6,7 +6,9 @@ import com.altrium.org.AppUser;
 import com.altrium.org.Department;
 import com.altrium.org.HrGrantService;
 import com.altrium.org.Role;
+import com.altrium.review.Rating;
 import com.altrium.testsupport.OrgFixture;
+import com.altrium.testsupport.ReviewFixture;
 import com.altrium.testsupport.StubJwtDecoderConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,9 @@ class ImprovementPlanScopeTest {
     private OrgFixture org;
 
     @Autowired
+    private ReviewFixture reviews;
+
+    @Autowired
     private HrGrantService grants;
 
     private String bearer(String handle) {
@@ -64,6 +69,13 @@ class ImprovementPlanScopeTest {
 
     /** Opens a plan for `subject` as their manager, so the service writes it, not a fixture. */
     private void openPlanFor(String managerHandle, AppUser subject) throws Exception {
+        // Scenario section 5 step 7: a plan follows a completed review. Seeded, because these
+        // tests are about who can see the plan afterwards, not about how the rating got there.
+        reviews.releasedRating(reviews.openCycle(), subject,
+                subject.getManager() == null ? subject : subject.getManager(),
+                Rating.NEEDS_IMPROVEMENT);
+        reviews.flush();
+
         mvc.perform(post(PLANS + "/" + subject.getId())
                         .header("Authorization", bearer(managerHandle))
                         .contentType(MediaType.APPLICATION_JSON)

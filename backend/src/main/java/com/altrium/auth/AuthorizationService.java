@@ -312,7 +312,7 @@ public class AuthorizationService {
         if (capability.allows(Grounds.HR_IN_SCOPE)
                 && !hrGroundsBlocked
                 && caller.hasRole(Role.HR)
-                && hrScope.resolve().covers(departmentId)) {
+                && hrScopeAllows(capability, departmentId)) {
             return Grounds.HR_IN_SCOPE;
         }
 
@@ -329,6 +329,29 @@ public class AuthorizationService {
         }
 
         return null;
+    }
+
+    /**
+     * Whether the caller's HR grants reach this request.
+     *
+     * <p>For an artifact or a department the question is the ordinary one: is <em>this</em>
+     * department granted (P-2.1, P-2.3, P-2.4, already applied by the resolver).
+     *
+     * <p>A {@link Capability.Kind#GLOBAL} capability names no department, because the resource
+     * is the caller's granted set rather than a member of it. The export is the case: it covers
+     * the whole of {@code grants(A)}, so there is no id to check and the question becomes
+     * whether anything was granted at all. An HR user with no grants holds no export, which is
+     * the same answer {@code covers} would give for every department they might name.
+     *
+     * <p>This widens nothing that exists. {@code CONFIGURE_CYCLE}, {@code MANAGE_ORG} and
+     * {@code READ_AGGREGATE_METRICS} are the other global capabilities and none lists
+     * {@code HR_IN_SCOPE}, so no decision made before this method existed changes.
+     */
+    private boolean hrScopeAllows(Capability capability, Long departmentId) {
+        HrScope scope = hrScope.resolve();
+        return capability.kind() == Capability.Kind.GLOBAL
+                ? !scope.isEmpty()
+                : scope.covers(departmentId);
     }
 
     /**

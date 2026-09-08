@@ -44,13 +44,19 @@ public class ReviewController {
      * <p>Scoped inside the SQL, so the {@code totalElements} of this page counts what the
      * caller may see - not what exists. A count computed before filtering would report the
      * size of the organisation to anybody who paged through it.
+     *
+     * <p>{@code excludeSelf} drops the caller's own row, for the manager's team screen: a
+     * manager who is themselves under review is not one of their own reports. It narrows the
+     * scope and so can only ever return fewer rows, never more, which is why it is safe as a
+     * request parameter - a caller who sets it gains nothing.
      */
     @GetMapping
     @Operation(summary = "Reviews the caller is permitted to see in a cycle, scoped in SQL")
     public Page<ReviewDtos.ReviewSummary> list(
             @RequestParam Long cycleId,
+            @RequestParam(defaultValue = "false") boolean excludeSelf,
             @PageableDefault(size = 25, sort = "subject.fullName") Pageable pageable) {
-        return reviews.listPermittedReviews(cycleId, pageable, ReviewDtos.ReviewSummary::of);
+        return reviews.listPermittedReviews(cycleId, excludeSelf, pageable, ReviewDtos.ReviewSummary::of);
     }
 
     /**

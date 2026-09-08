@@ -28,6 +28,31 @@ altrium:
   security:
     asgardeo-decoder: false
 
+  google:
+    # A fixed, fake client secret, which is what makes TokenCipher usable in tests: the key is
+    # derived from it, so with none set the cipher holds no key and every connection test would
+    # be refused for want of configuration rather than tested. No network call is made with it
+    # either way, since GoogleOAuthClient and CalendarClient are replaced in the tests that
+    # exercise the flow.
+    client-id: test-client-id
+    client-secret: test-client-secret-not-a-real-one
+    redirect-uri: http://localhost:8080/api/integrations/google/callback
+
+  # Pinned rather than left to default, so a slot test asserts against hours it states itself.
+  meetings:
+    zone: Europe/London
+    day-start: "09:00"
+    day-end: "17:00"
+
+  reminders:
+    # The scheduled job is switched off in tests. The sweep is called directly with a date, so a
+    # cron trigger firing mid-suite would only be a second, unpredictable run.
+    enabled: false
+
+    # No key, so no Resend bean is built and nothing can reach the network from a test. The
+    # tests that assert what was sent replace the sender outright.
+    api-key: 
+
 logging:
   level:
     com.altrium: DEBUG

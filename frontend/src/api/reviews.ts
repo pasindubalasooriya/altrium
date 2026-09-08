@@ -31,10 +31,27 @@ export function useCycles() {
 }
 
 /** The reviews the caller may see, paged on the server. */
-export function usePermittedReviews(cycleId: number | undefined, page: number, size = 25) {
+/**
+ * @param excludeSelf drops the caller's own row. For the manager's team screen, where a
+ *   manager under review is not one of their own reports. Applied in the server's `WHERE`
+ *   clause, not here, so `totalElements` counts the rows actually returned - filtering the
+ *   array would page a team of four as five.
+ */
+export function usePermittedReviews(
+  cycleId: number | undefined,
+  page: number,
+  size = 25,
+  excludeSelf = false,
+) {
   return useQuery({
-    queryKey: ['reviews', cycleId, page, size],
-    queryFn: () => api.get<Page<ReviewSummary>>('/api/reviews', { cycleId, page, size }),
+    queryKey: ['reviews', cycleId, page, size, excludeSelf],
+    queryFn: () =>
+      api.get<Page<ReviewSummary>>('/api/reviews', {
+        cycleId,
+        page,
+        size,
+        excludeSelf: excludeSelf || undefined,
+      }),
     enabled: cycleId !== undefined,
   })
 }

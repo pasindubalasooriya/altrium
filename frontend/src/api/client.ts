@@ -199,4 +199,40 @@ export const api = {
 
   del: <T>(path: string, query?: Record<string, QueryValue>) =>
     request<T>('DELETE', path, { query }),
+
+  /**
+   * Fetches a file rather than JSON, for exports.
+   *
+   * A plain `<a href>` cannot be used for these: the endpoint needs an `Authorization` header
+   * and a link sends none, so the browser would be answered with a 401 and show a broken
+   * download. The bytes are fetched with the same token as everything else and handed back as
+   * a blob for the caller to save.
+   *
+   * The filename comes from the server's `Content-Disposition`, because the server is what
+   * knows which cycle and which day the file covers. Falling back to a name invented here
+   * would produce a plausible file with a wrong label, which is worse than an ugly one.
+   */
+  download: async (path: string, query?: Record<string, QueryValue>) => {
+    const token = await bearerToken()
+
+    let response: Response
+    try {
+      response = await fetch(url(path, query), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch (cause) {
+      console.warn('[altrium] fetch itself failed - network, DNS or CORS', 'GET', path, cause)
+      throw new ApiError(0, 'Could not reach the Altrium API.')
+    }
+
+    if (!response.ok) {
+      throw new ApiError(response.status, await describe(response))
+    }
+
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const match = /filename="?([^";]+)"?/i.exec(disposition)
+
+    return { blob: await response.blob(), filename: match?.[1] ?? 'altrium-export' }
+  },
 }

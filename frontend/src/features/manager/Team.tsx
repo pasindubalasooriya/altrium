@@ -24,7 +24,9 @@ export function Team() {
   const { data: me } = useCurrentUser()
   const { cycles, cycleId, setCycleId } = useSelectedCycle()
   const { page, size, setPage } = usePaging()
-  const { data: reviews, isPending, error } = usePermittedReviews(cycleId, page, size)
+  // Excluding the caller's own row is the server's job, in the WHERE clause. Dropping it here
+  // would leave the pager counting a row the table does not show.
+  const { data: reviews, isPending, error } = usePermittedReviews(cycleId, page, size, true)
 
   return (
     <>
@@ -55,15 +57,6 @@ export function Team() {
                 <tr key={review.subjectId} className="border-b border-line/60 last:border-0">
                   <td className="p-3">
                     {review.subjectName}
-                    {/*
-                      The caller's own row appears in this list when they are themselves under
-                      review - they are the subject, and SELF is a ground on the summary. It is
-                      marked rather than removed, because their own record is genuinely theirs
-                      to read.
-                    */}
-                    {review.subjectId === me?.id && (
-                      <span className="ml-2 text-xs text-muted">(you)</span>
-                    )}
                     {!review.subjectActive && (
                       <span className="ml-2 text-xs text-warn">deactivated</span>
                     )}

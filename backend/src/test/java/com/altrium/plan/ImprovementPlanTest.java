@@ -6,7 +6,9 @@ import com.altrium.org.AppUser;
 import com.altrium.org.Department;
 import com.altrium.org.HrGrantService;
 import com.altrium.org.Role;
+import com.altrium.review.Rating;
 import com.altrium.testsupport.OrgFixture;
+import com.altrium.testsupport.ReviewFixture;
 import com.altrium.testsupport.PlanFixture;
 import com.altrium.testsupport.StubJwtDecoderConfig;
 import com.jayway.jsonpath.JsonPath;
@@ -60,6 +62,9 @@ class ImprovementPlanTest {
     private OrgFixture org;
 
     @Autowired
+    private ReviewFixture reviews;
+
+    @Autowired
     private PlanFixture planFixture;
 
     @Autowired
@@ -90,8 +95,26 @@ class ImprovementPlanTest {
         return LocalDate.now().plusMonths(3);
     }
 
+    /**
+     * Gives the subject a completed review, which an improvement plan now requires.
+     *
+     * <p>Scenario section 5 puts the PIP at step 7, after the rating is shared at step 6, so
+     * every test that opens a plan needs an employee who has been through one. Seeded rather
+     * than driven through the API because these tests are about the plan, not about how the
+     * rating got there. {@code openCycle()} allocates a fresh period per call, so this is safe
+     * to call from tests that already have a cycle of their own.
+     */
+    private void completeAReview(AppUser subject, AppUser manager) {
+        reviews.releasedRating(reviews.openCycle(), subject, manager, Rating.NEEDS_IMPROVEMENT);
+        reviews.flush();
+    }
+
     /** Opens a plan through the API and returns its id, the way a client would. */
     private long openPlan(String manager, AppUser subject, String clause) throws Exception {
+        // The precondition the feature now carries. Every test below wants a plan that opened,
+        // not a test of the gate itself - that has its own test.
+        completeAReview(subject, subject.getManager() == null ? subject : subject.getManager());
+
         String json = mvc.perform(post(PIPS + "/" + subject.getId())
                         .header("Authorization", bearer(manager))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -131,12 +154,116 @@ class ImprovementPlanTest {
         // Both halves in one transaction. An employee on an improvement plan whose development
         // plan is still running is exactly the state P-5.7 forbids, and a two-step version
         // would pass through it every single time.
-        mvc.perform(get(PDPS + "/me").header("Authorization", bearer("john")))
+        //
+        // Read through the manager, because the row is the truth and she is entitled to it.
+        // What John sees before the co-signature is the next test.
+        mvc.perform(get(PDPS + "/" + john.getId()).header("Authorization", bearer("elena")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUSPENDED"))
                 .andExpect(jsonPath("$.active").value(false))
                 // The goals are untouched. Suspension is not deletion.
                 .andExpect(jsonPath("$.goals.length()").value(1));
+    }
+
+    /**
+     * The co-sign gate, closed from the side it used to leak through.
+     *
+     * <p>Suspension has one cause, so telling the employee their plan is on hold tells them an
+     * improvement plan exists - the fact P-5.3 withholds until HR sign it. The plan screen was
+     * announcing it and then linking to a page that denied any plan existed, which is both a
+     * disclosure and a contradiction the employee could see.
+     */
+    @Test
+    @DisplayName("P-5.3: the employee is not told their plan is suspended until HR co-sign")
+    void P_5_3_suspensionIsWithheldUntilCosignature() throws Exception {
+        Department engineering = org.department("Engineering");
+        Department peopleOps = org.department("People Operations");
+        AppUser hana = org.userIn(peopleOps, "hana-susp", Role.EMPLOYEE, Role.HR);
+        AppUser elena = org.userIn(engineering, "elena-susp", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-susp", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+        grants.grant(hana.getId(), engineering.getId(), false, null, g -> g.getId());
+
+        long planId = openPlan("elena-susp", john, CLAUSE);
+
+        // Before the co-signature: John's plan reads exactly as it did the day before it was
+        // opened. Not "suspended", not a hint - the same answer as somebody with no plan at all.
+        mvc.perform(get(PDPS + "/me").header("Authorization", bearer("john-susp")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.suspendedAt").doesNotExist());
+
+        // And the improvement plan itself is withheld, which is the gate this is protecting.
+        mvc.perform(get(PIPS + "/me").header("Authorization", bearer("john-susp")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPlan").value(false));
+
+        mvc.perform(post(PIPS + "/" + planId + "/cosign")
+                        .header("Authorization", bearer("hana-susp")))
+                .andExpect(status().isOk());
+
+        // After it, both halves arrive together. The suspension and the plan that explains it
+        // become visible in the same moment, so the console can never say one without the other.
+        mvc.perform(get(PDPS + "/me").header("Authorization", bearer("john-susp")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"))
+                .andExpect(jsonPath("$.active").value(false));
+
+        mvc.perform(get(PIPS + "/me").header("Authorization", bearer("john-susp")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPlan").value(true));
+    }
+
+    /**
+     * Scenario section 5 step 7: the improvement plan is where a completed review routes, not
+     * something that runs beside one. Until the employee has been told an outcome there is
+     * nothing for a plan to correct.
+     */
+    @Test
+    @DisplayName("section 5: an improvement plan cannot open before the rating is shared")
+    void section_5_improvementPlanFollowsACompletedReview() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-nofr", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-nofr", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        // 409: Elena holds OPEN_IMPROVEMENT_PLAN on her own report throughout. It is the
+        // absence of a completed review that refuses, not her standing to ask.
+        mvc.perform(post(PIPS + "/" + john.getId())
+                        .header("Authorization", bearer("elena-nofr"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"consequenceClause\":" + quote(CLAUSE)
+                                + ",\"deadline\":\"" + future() + "\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    /**
+     * A rating that is set but not released is a decision the employee has not been given, so
+     * it does not open the door either. This is the test that separates "the review happened"
+     * from "the review finished".
+     */
+    @Test
+    @DisplayName("section 5: an unreleased rating is not a completed review")
+    void section_5_unreleasedRatingDoesNotOpenTheDoor() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-unrel", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-unrel", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        reviews.unreleasedRating(
+                reviews.openCycle(), john, elena, Rating.NEEDS_IMPROVEMENT);
+        reviews.flush();
+
+        mvc.perform(post(PIPS + "/" + john.getId())
+                        .header("Authorization", bearer("elena-unrel"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"consequenceClause\":" + quote(CLAUSE)
+                                + ",\"deadline\":\"" + future() + "\"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -625,5 +752,150 @@ class ImprovementPlanTest {
                         .content("{\"consequenceClause\":" + quote(CLAUSE)
                                 + ",\"deadline\":\"" + future() + "\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    // ================================================================ progress on a PIP goal
+
+    /**
+     * Adds a goal to an improvement plan and returns its id.
+     */
+    private long addImprovementGoal(String manager, long planId, String title) throws Exception {
+        String json = mvc.perform(post(PIPS + "/" + planId + "/goals")
+                        .header("Authorization", bearer(manager))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":" + quote(title) + "}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(json, "$.id")).longValue();
+    }
+
+    /**
+     * A PIP runs for months and is judged at the end. Without this the only writing on the plan
+     * is the goal set on day one and the pass or fail at the close, and nothing in between
+     * explains the outcome.
+     */
+    @Test
+    @DisplayName("P-5.9: the manager records progress on an improvement goal")
+    void P_5_9_managerRecordsProgressOnAnImprovementGoal() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-pipprog", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-pipprog", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        long planId = openPlan("elena-pipprog", john, CLAUSE);
+        long goalId = addImprovementGoal("elena-pipprog", planId, "Close tickets within the SLA");
+
+        // The agreement gate is a development concept. An improvement goal has no agreement to
+        // wait for, so this must not be refused for the want of one.
+        mvc.perform(put(PDPS + "/goals/" + goalId + "/progress")
+                        .header("Authorization", bearer("elena-pipprog"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"note":"Two weeks in, the backlog is down but response time is not"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progressNote").value(
+                        "Two weeks in, the backlog is down but response time is not"));
+    }
+
+    /**
+     * The line that makes a PIP a PIP.
+     *
+     * <p>{@code REPORT_GOAL_PROGRESS} carries {@code SELF} and would have let John write on his
+     * own plan. Progress on an improvement goal therefore takes
+     * {@code WRITE_IMPROVEMENT_PLAN} instead, which is {@code DIRECT_MANAGER} alone - an
+     * improvement plan is put to somebody rather than agreed with them, and an employee who
+     * could annotate their own would be arguing with the record rather than meeting it.
+     */
+    @Test
+    @DisplayName("P-5.3: the employee cannot record progress on their own improvement goal")
+    void P_5_3_employeeCannotWriteProgressOnTheirOwnImprovementGoal() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-pipself", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-pipself", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        long planId = openPlan("elena-pipself", john, CLAUSE);
+        long goalId = addImprovementGoal("elena-pipself", planId, "Close tickets within the SLA");
+
+        mvc.perform(put(PDPS + "/goals/" + goalId + "/progress")
+                        .header("Authorization", bearer("john-pipself"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"note":"I think this is unfair"}"""))
+                .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The employee's own development goals are untouched by the change above. Narrowing the PIP
+     * branch must not narrow the PDP one, which is the whole collaboration P-5.9 preserves.
+     */
+    @Test
+    @DisplayName("P-5.9: the employee still records progress on their own development goal")
+    void P_5_9_employeeStillWritesProgressOnADevelopmentGoal() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-pdpprog", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-pdpprog", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        String goal = mvc.perform(post(PDPS + "/" + john.getId() + "/goals")
+                        .header("Authorization", bearer("elena-pdpprog"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Lead a design review"}"""))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        agree(goal, "elena-pdpprog", "john-pdpprog");
+        long goalId = ((Number) JsonPath.read(goal, "$.id")).longValue();
+
+        mvc.perform(put(PDPS + "/goals/" + goalId + "/progress")
+                        .header("Authorization", bearer("john-pdpprog"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"note":"Ran my first one this sprint"}"""))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * The manager marks an improvement goal complete, and closing the plan puts the employee
+     * back on their development plan with everything intact (P-5.2, P-5.7).
+     */
+    @Test
+    @DisplayName("P-5.2: the manager completes an improvement goal, and passing restores the PDP")
+    void P_5_2_managerCompletesAnImprovementGoalThenPasses() throws Exception {
+        Department engineering = org.department("Engineering");
+        Department peopleOps = org.department("People Operations");
+        AppUser hana = org.userIn(peopleOps, "hana-pipdone", Role.EMPLOYEE, Role.HR);
+        AppUser elena = org.userIn(engineering, "elena-pipdone", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-pipdone", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+        grants.grant(hana.getId(), engineering.getId(), false, null, g -> g.getId());
+
+        long planId = openPlan("elena-pipdone", john, CLAUSE);
+        long goalId = addImprovementGoal("elena-pipdone", planId, "Close tickets within the SLA");
+
+        // A plan the employee has never seen cannot be passed or failed, so HR co-sign first.
+        mvc.perform(post(PIPS + "/" + planId + "/cosign")
+                        .header("Authorization", bearer("hana-pipdone")))
+                .andExpect(status().isOk());
+
+        mvc.perform(post(PDPS + "/goals/" + goalId + "/approval")
+                        .header("Authorization", bearer("elena-pipdone")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETE"));
+
+        mvc.perform(post(PIPS + "/" + planId + "/pass")
+                        .header("Authorization", bearer("elena-pipdone")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PASSED"));
+
+        // Back on the development track without anybody doing anything else.
+        mvc.perform(get(PDPS + "/me").header("Authorization", bearer("john-pipdone")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.active").value(true));
     }
 }

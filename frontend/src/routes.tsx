@@ -7,6 +7,7 @@ import { MyReviews } from './features/my/MyReviews'
 import { SelfReview } from './features/my/SelfReview'
 import { PeerTasks } from './features/my/PeerTasks'
 import { MyPlan } from './features/my/MyPlan'
+import { MyHistory } from './features/my/MyHistory'
 import { MyImprovementPlan } from './features/my/MyImprovementPlan'
 import { Team } from './features/manager/Team'
 import { ReviewDetail } from './features/manager/ReviewDetail'
@@ -20,6 +21,7 @@ import { Departments } from './features/admin/Departments'
 import { HrGrants } from './features/admin/HrGrants'
 import { Cycles } from './features/admin/Cycles'
 import { Cohorts } from './features/admin/Cohorts'
+import { CalendarSettings } from './features/meetings/CalendarSettings'
 
 /**
  * The one lazily loaded route.
@@ -31,6 +33,14 @@ import { Cohorts } from './features/admin/Cohorts'
  */
 const Metrics = lazy(() =>
   import('./features/leadership/Metrics').then((module) => ({ default: module.Metrics })),
+)
+
+/**
+ * Lazy for the same reason: it draws the same Recharts distribution. Loading a third of the
+ * bundle for a screen the employee and Super Admin never open would undo the split above.
+ */
+const Dashboard = lazy(() =>
+  import('./features/dashboard/Dashboard').then((module) => ({ default: module.Dashboard })),
 )
 
 /**
@@ -61,8 +71,25 @@ export function AppRoutes() {
           Redirected rather than dropped, for anybody holding the old link.
         */}
         <Route path="my/rating" element={<Navigate to="/my/reviews" replace />} />
+        <Route path="my/history" element={<MyHistory />} />
         <Route path="my/plan" element={<MyPlan />} />
         <Route path="my/improvement-plan" element={<MyImprovementPlan />} />
+
+        <Route
+          path="dashboard"
+          element={
+            <Suspense fallback={<Loading />}>
+              <Dashboard />
+            </Suspense>
+          }
+        />
+
+        {/*
+          Where Google's OAuth redirect lands. The path is in the server's `altrium.app-url`
+          plus `/settings/calendar`, so the two must stay in step: change one and the consent
+          round trip returns people to a page that does not exist.
+        */}
+        <Route path="settings/calendar" element={<CalendarSettings />} />
 
         <Route path="manager/team" element={<Team />} />
         <Route path="manager/reviews/:subjectId" element={<ReviewDetail />} />

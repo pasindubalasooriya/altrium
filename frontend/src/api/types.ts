@@ -309,3 +309,24 @@ export interface OwnImprovementPlan {
   hasPlan: boolean
   plan: ImprovementPlan | null
 }
+
+/**
+ * One cycle in somebody's history (P-4.9).
+ *
+ * `rating`, `releasedAt` and `managerFeedback` are null both when the caller may not see them
+ * and when nothing was ever recorded, and the two are deliberately indistinguishable: telling
+ * them apart would disclose that a decision exists and is being withheld, which is exactly what
+ * release controls (P-4.4). So nothing in this app may render "withheld" for a null here - the
+ * only honest words are "not shared yet", which is equally true of both.
+ */
+export interface TimelineEntry {
+  cycleId: number
+  financialYear: number
+  quadrimester: number
+  cycleStatus: CycleStatus
+  startDate: string
+  endDate: string
+  rating: Rating | null
+  releasedAt: string | null
+  managerFeedback: string | null
+}

@@ -18,10 +18,16 @@ import type { DevelopmentPlan, Goal, ImprovementPlan, OwnImprovementPlan } from 
 
 // ---------------------------------------------------------------- development plan
 
-export function useMyDevelopmentPlan() {
+/**
+ * @param enabled false for accounts that hold no plan at all - the Super Admin (P-9.5) and
+ *   Leadership, who are never reviewed. The server refuses them anyway, at step 2 of the
+ *   evaluation order; this simply does not ask a question whose answer is always 403.
+ */
+export function useMyDevelopmentPlan(enabled = true) {
   return useQuery({
     queryKey: ['development-plan', 'me'],
     queryFn: () => api.get<DevelopmentPlan>('/api/plans/development/me'),
+    enabled,
   })
 }
 
@@ -153,10 +159,12 @@ export function useRemoveGoal(planKey: unknown[]) {
 
 // ---------------------------------------------------------------- improvement plan
 
-export function useMyImprovementPlan() {
+/** @param enabled see {@link useMyDevelopmentPlan}. */
+export function useMyImprovementPlan(enabled = true) {
   return useQuery({
     queryKey: ['improvement-plan', 'me'],
     queryFn: () => api.get<OwnImprovementPlan>('/api/plans/improvement/me'),
+    enabled,
   })
 }
 

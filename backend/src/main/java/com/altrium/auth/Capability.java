@@ -221,7 +221,51 @@ public enum Capability {
     MANAGE_ORG(Kind.GLOBAL, "P-9.1/P-9.2", SUPER_ADMIN),
 
     /** Totals only. No endpoint drills from an aggregate to an individual row (P-7.1). */
-    READ_AGGREGATE_METRICS(Kind.GLOBAL, "P-7.1", LEADERSHIP);
+    READ_AGGREGATE_METRICS(Kind.GLOBAL, "P-7.1", LEADERSHIP),
+
+    /**
+     * Taking a report out of the system as a file (P-8.1).
+     *
+     * <p><strong>{@link Grounds#DIRECT_MANAGER} is absent, and that is the whole policy.</strong>
+     * A manager may read every one of these rows on their own dashboard; what they may not do is
+     * take them out of the system. Scenario section 6 draws the line there deliberately, and it
+     * is a line about distribution rather than about visibility: a file outlives the permission
+     * that produced it and travels where no check follows it.
+     *
+     * <p>Global rather than per department, because an HR export covers the whole of
+     * {@code grants(A)} rather than one department named in the request. For a global
+     * capability {@code HR_IN_SCOPE} therefore means "holds HR and has been granted something",
+     * and the scope still decides what the file contains (P-8.2).
+     */
+    EXPORT_REPORT(Kind.GLOBAL, "P-8.1", HR_IN_SCOPE, LEADERSHIP),
+
+    // ---- Meetings (P-11) --------------------------------------------------------------
+
+    /**
+     * Booking the plan meeting with the employee (P-11.1, scenario section 12).
+     *
+     * <p>{@code mgr(S)} alone, matching who owns the plan the meeting exists to agree
+     * ({@link #WRITE_DEVELOPMENT_PLAN}, {@link #OPEN_IMPROVEMENT_PLAN}). {@link Grounds#SELF}
+     * is absent: an employee cannot summon their manager to a review conversation, and the
+     * scenario has the manager scheduling it. HR is absent for the same reason they write
+     * nothing to a development plan.
+     */
+    SCHEDULE_PLAN_MEETING(Kind.ARTIFACT, "P-11.1", DIRECT_MANAGER),
+
+    /**
+     * Booking the normalization meeting with the manager (P-11.2, scenario section 5 step 5).
+     *
+     * <p>The subject is the employee whose rating is being calibrated, not the manager who is
+     * invited. That choice is what makes this capability the same question as
+     * {@link #CALIBRATE_RATING}, decided by the same department grant, and blocked by the same
+     * P-2.2 rule when the rating happens to be the HR user's own. An HR user cannot convene
+     * the meeting that calibrates them any more than they can perform the calibration.
+     *
+     * <p>{@link Grounds#DIRECT_MANAGER} is absent, and deliberately. The scenario has HR
+     * calling this meeting; a manager who could call it could arrange the calibration of their
+     * own judgment on their own terms.
+     */
+    SCHEDULE_NORMALIZATION_MEETING(Kind.ARTIFACT, "P-11.2", HR_IN_SCOPE);
 
     /** What the capability is asked about, which determines what must be supplied to decide. */
     public enum Kind {

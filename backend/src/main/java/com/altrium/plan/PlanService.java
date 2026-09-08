@@ -11,6 +11,7 @@ import com.altrium.config.ConflictApiException;
 import com.altrium.config.NotFoundApiException;
 import com.altrium.config.ValidationApiException;
 import com.altrium.org.AppUserRepository;
+import com.altrium.review.FinalRatingRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -68,6 +71,7 @@ public class PlanService {
     private final DevelopmentPlanRepository plans;
     private final PlanGoalRepository goals;
     private final ImprovementPlanRepository improvementPlans;
+    private final FinalRatingRepository finalRatings;
     private final Clock clock;
 
     public PlanService(AuthorizationService authorization,
@@ -76,6 +80,7 @@ public class PlanService {
                        DevelopmentPlanRepository plans,
                        PlanGoalRepository goals,
                        ImprovementPlanRepository improvementPlans,
+                       FinalRatingRepository finalRatings,
                        Clock clock) {
         this.authorization = authorization;
         this.currentUser = currentUser;
@@ -83,13 +88,27 @@ public class PlanService {
         this.plans = plans;
         this.goals = goals;
         this.improvementPlans = improvementPlans;
+        this.finalRatings = finalRatings;
         this.clock = clock;
     }
 
     // ================================================================= reading
 
+    /**
+     * How a plan is presented to one caller.
+     *
+     * <p>Three arguments rather than two because {@code suspensionVisible} is a decision, not a
+     * property of the row: the same suspended plan is shown as suspended to the manager and as
+     * ordinary to the employee whose improvement plan HR have not yet co-signed. See
+     * {@link #readPlan}.
+     */
+    @FunctionalInterface
+    public interface PlanMapper<T> {
+        T map(DevelopmentPlan plan, List<PlanGoal> goals, boolean suspensionVisible);
+    }
+
     /** The caller's own plan. Takes no id, so it cannot be pointed at anybody else. */
-    public <T> T myPlan(BiFunction<DevelopmentPlan, List<PlanGoal>, T> mapper) {
+    public <T> T myPlan(PlanMapper<T> mapper) {
         return readPlan(currentUser.require().id(), mapper);
     }
 
@@ -100,7 +119,7 @@ public class PlanService {
      * manager asking about a report who has never opened the app gets an empty plan rather than
      * a 404, because the employee does have one - nobody had written it down.
      */
-    public <T> T readPlan(Long userId, BiFunction<DevelopmentPlan, List<PlanGoal>, T> mapper) {
+    public <T> T readPlan(Long userId, PlanMapper<T> mapper) {
         ReviewSubject subject = authorization.subject(userId);
         authorization.require(Capability.READ_DEVELOPMENT_PLAN, subject);
 
@@ -113,7 +132,33 @@ public class PlanService {
         boolean callerIsSubject = currentUser.require().id().equals(userId);
         List<PlanGoal> visible = goals.findForPlan(plan.getId(), !callerIsSubject);
 
-        return mapper.apply(plan, visible);
+        return mapper.map(plan, visible, suspensionVisibleTo(userId, callerIsSubject));
+    }
+
+    /**
+     * Whether this caller may be told the plan is suspended.
+     *
+     * <p>Suspension has exactly one cause: an improvement plan was opened (P-5.7). So telling
+     * the employee their plan is on hold tells them a PIP exists - which is the fact P-5.3
+     * withholds until HR have co-signed it. The plan screen was defeating the co-sign gate from
+     * the side: it said "on hold while an improvement plan is running" and linked to a page
+     * that then denied any plan existed.
+     *
+     * <p>So for the subject, and only for the subject, an uncosigned suspension is presented as
+     * an ordinary active plan. The manager and HR always see the truth - somebody has to draft
+     * it and somebody has to review it before signing.
+     *
+     * <p>The row is untouched. This is presentation, not state: writes to a suspended plan are
+     * still refused with 409, which is the one visible seam and is preferable to disclosing the
+     * plan early.
+     */
+    private boolean suspensionVisibleTo(Long userId, boolean callerIsSubject) {
+        if (!callerIsSubject) {
+            return true;
+        }
+        return improvementPlans.findByUserIdAndStatus(userId, ImprovementStatus.ACTIVE)
+                .map(ImprovementPlan::isCosigned)
+                .orElse(true);
     }
 
     // ================================================================= writing
@@ -295,15 +340,37 @@ public class PlanService {
      * reporting progress from quietly restating the goal. Held by the employee and their
      * manager: section 8 asks for progress to be tracked and updated without saying by whom,
      * and a manager writing it up after a conversation is as ordinary as the employee typing it.
+     *
+     * <h2>On an improvement goal, the manager alone</h2>
+     *
+     * <p>A PIP runs for months against a fixed deadline and is judged at the end, so the
+     * manager needs somewhere to record how it is actually going - otherwise the only writing
+     * on the plan is the goal set on day one and the pass or fail at the end, and nothing in
+     * between explains the outcome.
+     *
+     * <p>But the employee still writes nothing. An improvement plan is put <em>to</em> somebody
+     * rather than agreed with them, so this takes {@link Capability#WRITE_IMPROVEMENT_PLAN} -
+     * {@code DIRECT_MANAGER} and no {@code SELF} - rather than
+     * {@link Capability#REPORT_GOAL_PROGRESS}, which carries both. That is the whole difference
+     * between the growth track and the corrective track, and it is worth two capabilities.
+     *
+     * <p>The agreement gate below is a development concept and is skipped for a PIP goal. An
+     * improvement goal has no agreement to wait for - it is live once the plan is co-signed,
+     * and P-5.3 governs that a level up.
      */
     public <T> T reportProgress(Long goalId, String note, Function<PlanGoal, T> mapper) {
-        PlanGoal goal = requireDevelopmentGoal(goalId, "updated");
-        authorization.require(Capability.REPORT_GOAL_PROGRESS, subjectOf(goal));
+        PlanGoal goal = requireGoal(goalId);
 
-        if (!goal.isAgreed()) {
-            throw new ConflictApiException(
-                    "Progress can be recorded once the goal has been agreed");
+        if (goal.isImprovementGoal()) {
+            authorization.require(Capability.WRITE_IMPROVEMENT_PLAN, subjectOf(goal));
+        } else {
+            authorization.require(Capability.REPORT_GOAL_PROGRESS, subjectOf(goal));
+            if (!goal.isAgreed()) {
+                throw new ConflictApiException(
+                        "Progress can be recorded once the goal has been agreed");
+            }
         }
+
         if (goal.isComplete()) {
             throw new ConflictApiException(
                     "That goal was approved as complete; reopen it before recording more progress");
@@ -364,6 +431,24 @@ public class PlanService {
             // since nobody can extend it the plan could only ever fail.
             throw new ValidationApiException("An improvement plan's deadline must be in the future");
         }
+        // Scenario section 5 puts this at step 7, after the rating is shared at step 6: the
+        // improvement plan is where a completed review routes, not something that runs beside
+        // one. Until the employee has been told an outcome there is nothing for a plan to
+        // correct, and opening one first would present a judgment they have never heard.
+        //
+        // Released rather than merely set - a rating sitting with HR is a decision the employee
+        // has not been given. Any cycle rather than the current one, because section 9 allows a
+        // slipped development plan to be suspended in favour of a new improvement plan later,
+        // which is not tied to the review that has just finished.
+        //
+        // 409 and not 403: the manager holds OPEN_IMPROVEMENT_PLAN on their report throughout,
+        // and it is the absence of a completed review that refuses.
+        if (!finalRatings.existsBySubjectIdAndReleasedAtIsNotNull(userId)) {
+            throw new ConflictApiException(
+                    "An improvement plan follows a completed review. Share this employee's"
+                            + " final rating with them first, then open one.");
+        }
+
         improvementPlans.findByUserIdAndStatus(userId, ImprovementStatus.ACTIVE)
                 .ifPresent(existing -> {
                     throw new ConflictApiException(
@@ -540,9 +625,16 @@ public class PlanService {
      * <p>"No plan" and "a plan exists but has not been co-signed" produce the same response, in
      * the same way an unreleased rating does. Distinguishing them would tell the employee a plan
      * had been drafted about them, which is what the gate withholds.
+     *
+     * <p>The mapper runs <strong>inside</strong> this transaction, like every other read here.
+     * It used to return the entity for the controller to convert, which threw
+     * {@code LazyInitializationException} on a closed session the moment the view read the
+     * subject's or the opener's name - a 500 on the employee's own plan screen. Every test
+     * passed, because a {@code @Transactional} test holds the session open for the whole method
+     * and the proxy still resolves.
      */
     @Transactional(readOnly = true)
-    public Optional<ImprovementPlan> myImprovementPlan() {
+    public <T> Optional<T> myImprovementPlan(Function<ImprovementPlan, T> mapper) {
         Long callerId = currentUser.require().id();
         ReviewSubject subject = authorization.subject(callerId);
 
@@ -550,7 +642,8 @@ public class PlanService {
                 .filter(plan -> authorization.decide(
                                 Capability.READ_IMPROVEMENT_PLAN, subject,
                                 ArtifactState.cosigned(plan.isCosigned()))
-                        .permitted());
+                        .permitted())
+                .map(mapper);
     }
 
     /**
@@ -622,6 +715,39 @@ public class PlanService {
                 .stream()
                 .map(mapper)
                 .toList();
+    }
+
+    /**
+     * When each of the caller's direct reports last had progress recorded on a goal.
+     *
+     * <p>Exists because nothing else tells a manager. The employee writes a progress note and
+     * it lands on a page nobody opens without a reason; no email goes out in Sprint 1. This is
+     * the reason.
+     *
+     * <p>Scoped to {@code directReportIds} and nothing else. HR read plans (P-5.1) but do not
+     * chase them, and handing an HR user a feed of every plan movement in their departments
+     * would be a different feature with a different justification - so the HR half of the scope
+     * is deliberately unused here rather than passed through because it happened to be
+     * available.
+     *
+     * @return report id to the time progress was last recorded, absent where there is none
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Instant> latestGoalProgressForMyReports() {
+        SubjectScope scope = authorization.subjectScopeFor(Capability.READ_DEVELOPMENT_PLAN);
+        Set<Long> reports = scope.directReportIds();
+
+        if (reports.isEmpty()) {
+            // No query at all. An IN clause over an empty set is a SQL error in some dialects
+            // and a full scan in others, and neither is a good way to express "nothing".
+            return Map.of();
+        }
+
+        Map<Long, Instant> latest = new HashMap<>();
+        for (Object[] row : goals.findLatestProgressFor(reports)) {
+            latest.put((Long) row[0], (Instant) row[1]);
+        }
+        return latest;
     }
 
     // ================================================================= internals

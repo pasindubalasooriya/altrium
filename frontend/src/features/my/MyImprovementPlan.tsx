@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useMyImprovementPlan } from '../../api/plans'
+import { markImprovementPlanSeen } from './planWaiting'
 import { Card, Fact, when } from '../../components/Form'
 import { Loading, QueryFailure } from '../../components/States'
 import type { ImprovementPlan } from '../../api/types'
@@ -18,6 +20,16 @@ import type { ImprovementPlan } from '../../api/types'
  */
 export function MyImprovementPlan() {
   const { data, isPending, error } = useMyImprovementPlan()
+
+  // Opening this page is what counts as having seen the plan, and it clears the navigation dot.
+  // In an effect rather than during render, because it writes to storage - and keyed on the
+  // plan's id, so a later second plan dots again instead of being swallowed by this receipt.
+  const planId = data?.hasPlan ? (data.plan?.id ?? null) : null
+  useEffect(() => {
+    if (planId !== null) {
+      markImprovementPlanSeen(planId)
+    }
+  }, [planId])
 
   if (isPending) {
     return <Loading />

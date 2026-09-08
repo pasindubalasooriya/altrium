@@ -14,6 +14,8 @@ import {
 } from '../../components/Form'
 import { Loading, QueryFailure } from '../../components/States'
 import { RATINGS, RATING_LABELS, type Rating, type Section } from '../../api/types'
+import { PreviousCycles } from '../history/PreviousCycles'
+import { ScheduleMeeting } from '../meetings/ScheduleMeeting'
 
 /**
  * One person's record as HR see it, with the calibration controls.
@@ -61,6 +63,12 @@ export function Calibration() {
       </p>
 
       <div className="grid gap-4">
+        {/*
+          Calibration is a judgment about whether this rating sits right against the others, and
+          a person's own previous ratings are part of that comparison (scenario section 11).
+        */}
+        <PreviousCycles userId={id} excludeCycleId={cycleId} />
+
         <Card title="Self-review">
           {visible('SELF_REVIEW') && record.selfReview ? (
             <div className="grid gap-3 text-sm">
@@ -177,6 +185,18 @@ export function Calibration() {
             </p>
           )}
         </Card>
+
+        {/*
+          The normalization meeting (scenario section 5 step 5), beside the calibration it
+          exists to hold. The invitation goes to this employee's manager, and the same grant
+          that admits the calibration below admits the meeting - which is why an HR user
+          looking at their own record is refused both.
+        */}
+        <ScheduleMeeting
+          type="NORMALIZATION_MEETING"
+          subjectId={id}
+          subjectName={record.summary.subjectName}
+        />
 
         <Card title="Calibration history">
           {history.data?.length ? (

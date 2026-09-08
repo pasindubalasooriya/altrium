@@ -54,4 +54,22 @@ public record SubjectScope(
     public boolean isEmpty() {
         return !includeSelf && directReportIds.isEmpty() && hrDepartmentIds.isEmpty();
     }
+
+    /**
+     * The same scope with the caller's own row dropped, for a list that is about other people.
+     *
+     * <p>The manager's team screen is the case: a manager who is themselves under review was
+     * appearing among their own reports, because {@code SELF} is a ground on the review summary
+     * and the list is scoped by all of the caller's grounds at once. Their own record is still
+     * theirs to read - it is reached through the employee console, where it belongs.
+     *
+     * <p><strong>Narrowing only, and only ever in the query.</strong> This removes a ground the
+     * caller holds; it can never add one, so it cannot widen what a list returns. Dropping the
+     * row in Java afterwards would leave {@code totalElements} counting it, and a team of four
+     * would page as five - the same class of bug P-0.3 exists to prevent, arriving as a
+     * cosmetic fix.
+     */
+    public SubjectScope withoutSelf() {
+        return includeSelf ? new SubjectScope(callerId, false, directReportIds, hrDepartmentIds) : this;
+    }
 }

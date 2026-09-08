@@ -5,6 +5,7 @@ import com.altrium.org.Role;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
@@ -65,6 +66,25 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
+
+                        // The single authenticated-endpoint exception in the API, and it is
+                        // forced rather than chosen. Google redirects the browser here after
+                        // consent: it is a top-level navigation from another origin, so no
+                        // Authorization header can be attached and there is no session to fall
+                        // back on, Altrium being stateless by design.
+                        //
+                        // What identifies the caller instead is the `state` query parameter,
+                        // which OAuthStateStore minted against their user id when they clicked
+                        // Connect, and which is unguessable, single-use and ten minutes old at
+                        // most. A request without a state this server issued attaches nothing
+                        // to anybody, which is also the CSRF defence the OAuth specification
+                        // asks for.
+                        //
+                        // Note how narrow this is: one path, GET only, and it reads no review,
+                        // rating or plan content. It stores a token for one person and
+                        // redirects a browser.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/integrations/google/callback").permitAll()
 
                         // Every authenticated endpoint requires a provisioned, active user.
                         // An unprovisioned or deactivated caller carries no authorities, so

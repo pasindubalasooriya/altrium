@@ -81,8 +81,19 @@ public class RatingService {
     /**
      * Sets or changes the manager's rating for a direct report (P-4.1).
      *
-     * <p>Changeable while it is still the manager's own figure, and not afterwards. Two things
-     * end that:
+     * <p><strong>Set once.</strong> Setting a rating is submitting it for HR sign-off - there
+     * is no other act that hands it over - so the moment it exists it is with HR, and the
+     * manager does not take it back. From there only HR move it, by calibrating (P-4.3), and
+     * the trail records that they did.
+     *
+     * <p>This is stricter than it was. The rating used to stay editable until HR actually
+     * calibrated, which left a window where HR were looking at a figure the manager could
+     * change underneath them, and nothing recorded that it had moved. The audit trail is meant
+     * to answer "who decided this and when"; a rating revised silently between submission and
+     * sign-off is a decision the trail cannot see.
+     *
+     * <p>The two later refusals stay, and are reported separately because they mean different
+     * things to the person asking:
      *
      * <ul>
      *   <li><b>HR has calibrated it.</b> Letting the manager set it back would make
@@ -91,6 +102,9 @@ public class RatingService {
      *   <li><b>It has been released.</b> The employee has been told. Changing it silently
      *       afterwards is not a correction, it is a different conversation nobody has had.</li>
      * </ul>
+     *
+     * <p>All three are 409 and not 403: the manager holds {@code SET_FINAL_RATING} throughout,
+     * and it is the state of the record that refuses.
      */
     public <T> T setRating(Long cycleId, Long subjectId, Rating rating, Function<FinalRating, T> mapper) {
         if (rating == null) {
@@ -119,6 +133,8 @@ public class RatingService {
                     users.getReferenceById(currentUser.require().id()))));
         }
 
+        // Ordered from the furthest state back, so the message names the thing that actually
+        // happened rather than the first gate it trips.
         if (existing.isReleased()) {
             throw new ConflictApiException(
                     "This rating was released on " + existing.getReleasedAt()
@@ -128,9 +144,9 @@ public class RatingService {
             throw new ConflictApiException(
                     "HR has calibrated this rating; it is no longer the manager's to change (P-4.3)");
         }
-
-        existing.setRating(rating);
-        return mapper.apply(existing);
+        throw new ConflictApiException(
+                "This rating was submitted for calibration on " + existing.getSetAt()
+                        + " and is with HR. Only HR can change it now (P-4.1)");
     }
 
     // ================================================================= feature 13: HR calibrates

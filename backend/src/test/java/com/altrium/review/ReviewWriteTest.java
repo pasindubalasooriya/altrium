@@ -139,6 +139,61 @@ class ReviewWriteTest {
                 .andExpect(status().isConflict());
     }
 
+    /**
+     * A cycle opened for a cohort of somebody's reports does not put <em>them</em> under review.
+     *
+     * <p>Managing people who are being reviewed is not the same as being reviewed, and the two
+     * are easy to conflate because the manager's console fills up the moment the cycle opens.
+     * A self-review written by somebody outside the cohort would sit in the cycle with no
+     * manager review, no peers and no rating ever to come, and nobody would notice until
+     * somebody asked why the participant count disagreed with the self-review count.
+     *
+     * <p>404 rather than 403, and that is not carelessness. Elena holds
+     * {@code WRITE_SELF_REVIEW} on herself - {@code SELF} is its only ground - so this is not a
+     * denial; it is that the artifact she is asking to write has no cycle to belong to. The
+     * endpoint takes no subject id, so a 404 here discloses nothing about anybody else.
+     */
+    @Test
+    @DisplayName("P-6.1: a manager outside the cohort cannot self-review, though their reports can")
+    void P_6_1_managerOutsideTheCohortCannotSelfReview() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-outside", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-outside", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        // The cycle is open for the team only. Elena is deliberately not a participant.
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.flush();
+
+        // A draft is refused as well as a submission. Letting the draft through would store a
+        // row for somebody the cycle does not contain, and only the submit would ever complain.
+        mvc.perform(put(REVIEWS + "/self-review").param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("elena-outside"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"achievements":"ran the team"}"""))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(put(REVIEWS + "/self-review")
+                        .param("cycleId", cycleParam(cycle)).param("submit", "true")
+                        .header("Authorization", bearer("elena-outside"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"achievements":"ran the team"}"""))
+                .andExpect(status().isNotFound());
+
+        // The other half of the same rule: the cohort she manages is unaffected. Without this
+        // the test would still pass against a cycle that was simply broken for everybody.
+        mvc.perform(put(REVIEWS + "/self-review").param("cycleId", cycleParam(cycle))
+                        .header("Authorization", bearer("john-outside"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"achievements":"shipped the migration"}"""))
+                .andExpect(status().isOk());
+    }
+
     // ================================================================ feature 8: peer assignment
 
     @Test

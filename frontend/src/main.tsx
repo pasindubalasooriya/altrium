@@ -24,7 +24,16 @@ const queryClient = new QueryClient({
         }
         return attempt < 2
       },
-      refetchOnWindowFocus: false,
+      // Almost everything here changes in somebody *else's* session: HR co-sign a plan, HR
+      // sign a rating off, a peer submits. Nothing in this browser is mutating, so nothing
+      // invalidates the cache, and the tab shows an answer from before the other person acted -
+      // an employee left on "you are not on an improvement plan" after HR had co-signed one.
+      //
+      // Refetching when the window regains focus is the cheapest fix that matches how the app
+      // is actually used: two accounts, two windows, switching between them. There is no
+      // polling and no push in Sprint 1, so this is the only thing that closes the gap without
+      // asking people to reload.
+      refetchOnWindowFocus: true,
     },
     mutations: { retry: false },
   },

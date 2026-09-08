@@ -3,6 +3,7 @@ package com.altrium.web.plan;
 import com.altrium.plan.DevelopmentPlan;
 import com.altrium.plan.PlanGoal;
 import com.altrium.plan.PlanService;
+import com.altrium.plan.PlanStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Feature 15 - development plans (P-5.1, P-5.2, P-5.5).
@@ -92,8 +94,14 @@ public class DevelopmentPlanController {
          *
          * <p>Undated goals sort last: a goal with no date yet is one still being agreed, and it
          * belongs after the ones that have been.
+         *
+         * @param suspensionVisible false where the caller is the employee and their improvement
+         *   plan has not been co-signed. Suspension has one cause, so showing it would announce
+         *   the plan that P-5.3 withholds until HR sign it. The plan then reads as ordinary and
+         *   active to them, which is what it read as the day before it was opened.
          */
-        static PlanView of(DevelopmentPlan plan, List<PlanGoal> visibleGoals) {
+        static PlanView of(DevelopmentPlan plan, List<PlanGoal> visibleGoals,
+                           boolean suspensionVisible) {
             List<GoalView> goals = visibleGoals.stream()
                     .sorted(Comparator
                             .comparing(PlanGoal::getTargetDate,
@@ -105,9 +113,9 @@ public class DevelopmentPlanController {
             return new PlanView(
                     plan.getUser().getId(),
                     plan.getUser().getFullName(),
-                    plan.getStatus().name(),
-                    plan.isActive(),
-                    plan.getSuspendedAt(),
+                    suspensionVisible ? plan.getStatus().name() : PlanStatus.ACTIVE.name(),
+                    suspensionVisible ? plan.isActive() : true,
+                    suspensionVisible ? plan.getSuspendedAt() : null,
                     goals);
         }
     }
@@ -148,6 +156,23 @@ public class DevelopmentPlanController {
     @Operation(summary = "Reword a goal; refused once the employee has agreed to it (P-5.9)")
     public GoalView editGoal(@PathVariable Long goalId, @Valid @RequestBody GoalEditRequest request) {
         return plans.editGoal(goalId, request.title(), request.detail(), GoalView::of);
+    }
+
+    /**
+     * When each of the caller's direct reports last had progress recorded on a goal.
+     *
+     * <p>Drives the manager's prompt, and carries **timestamps only** - no goal, no note, no
+     * plan content. A manager may read all of that anyway, one report at a time, but a feed is
+     * a different shape from a page: this one exists to say "there is something to look at",
+     * and it says exactly that and nothing more.
+     *
+     * <p>A manager with no reports gets an empty object rather than a denial, the same shape
+     * the scoped review list takes for somebody who may see nothing.
+     */
+    @GetMapping("/my-team/progress")
+    @Operation(summary = "When each direct report last recorded progress; timestamps only")
+    public Map<Long, Instant> teamProgress() {
+        return plans.latestGoalProgressForMyReports();
     }
 
     /**

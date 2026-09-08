@@ -20,6 +20,7 @@ import {
 import { PeerPicker } from './PeerPicker'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { markPeerFeedbackSeen } from './peerSeen'
+import { PreviousCycles } from '../history/PreviousCycles'
 
 /**
  * One reviewee's record, as their manager.
@@ -81,6 +82,13 @@ export function ReviewDetail() {
       </p>
 
       <div className="grid gap-4">
+        {/*
+          Before the sections for this cycle, not after them. "So that I am not starting from
+          scratch each time" only holds if last cycle's outcome is in front of the manager while
+          they write this one, rather than a tab away (scenario section 5 step 9).
+        */}
+        <PreviousCycles userId={id} excludeCycleId={cycleId} />
+
         <Card title="Self-review">
           {visible('SELF_REVIEW') && record.selfReview ? (
             <div className="grid gap-3 text-sm">
@@ -432,19 +440,26 @@ function RatingCard({
       <CalibrationTrail rows={history.data} />
 
       <div className="grid gap-3">
-        <Field label="Rating">
-          <Select
-            value={rating}
-            disabled={released}
-            onChange={(e) => setRating(e.target.value as Rating)}
+        {/*
+          The picker is for choosing a rating that does not exist yet. Once one is submitted it
+          is with HR and the manager does not take it back (P-4.1), so the control goes rather
+          than sitting there to be refused - the current figure is already stated above, and
+          leaving an editable dropdown under it would invite a change that cannot happen.
+        */}
+        {!current && (
+          <Field
+            label="Rating"
+            hint="Submitting hands this to HR. Only they can change it afterwards."
           >
-            {RATINGS.map((value) => (
-              <option key={value} value={value}>
-                {RATING_LABELS[value]}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            <Select value={rating} onChange={(e) => setRating(e.target.value as Rating)}>
+              {RATINGS.map((value) => (
+                <option key={value} value={value}>
+                  {RATING_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         {/*
           Once HR have calibrated, or the rating has been shared, the server returns 409. That
@@ -471,19 +486,21 @@ function RatingCard({
               set, and only then may it be shared (P-4.8). The old label described the database
               write; this one describes what actually happens next.
 
-              It changes once a rating exists, because at that point the hand-off has already
-              happened and pressing this again only revises the figure while it is still the
-              manager's to revise (P-4.1). Saying "submit" a second time would promise a
-              hand-off that does not repeat.
+              Offered once. A submitted rating is with HR and no longer the manager's to change
+              (P-4.1), so there is no second press and no "update" - the correction route is to
+              ask HR to calibrate, which is what calibration is for and what leaves the change
+              on the record.
             */}
-            <Button
-              variant="primary"
-              busy={set.isPending}
-              busyLabel={current ? 'Updating' : 'Submitting'}
-              onClick={() => set.mutate(rating)}
-            >
-              {current ? 'Update rating' : 'Submit for calibration'}
-            </Button>
+            {!current && (
+              <Button
+                variant="primary"
+                busy={set.isPending}
+                busyLabel="Submitting"
+                onClick={() => set.mutate(rating)}
+              >
+                Submit for calibration
+              </Button>
+            )}
             {/*
               HR see the peer feedback, your review and the number, then either adjust it or
               approve it as set - and only then may it go to the employee (P-4.8). The control

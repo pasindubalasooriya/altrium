@@ -6,6 +6,8 @@ import { Loading, NotProvisioned, QueryFailure } from './States'
 import { useSelectedCycle } from './CycleSelect'
 import { useMyPeerAssignments, usePermittedReviews } from '../api/reviews'
 import { anyWaiting, hrIsWaitedOn, managerIsWaitedOn } from '../features/manager/waiting'
+import { useMyDevelopmentPlan, useMyImprovementPlan } from '../api/plans'
+import { planWaitsOnYou } from '../features/my/planWaiting'
 import { isForbidden } from '../api/errors'
 
 /**
@@ -62,6 +64,14 @@ function Header({ id, fullName, roles }: { id: number; fullName: string; roles: 
   const tasks = useMyPeerAssignments(participates ? cycleId : undefined)
   const peerReviewsOwed = tasks.data?.some((task) => !task.submitted) ?? false
 
+  // A goal submitted for agreement, or an improvement plan that HR have co-signed. Both arrive
+  // without a sound - the manager drafts a goal, HR co-sign a plan - and both live behind a tab
+  // nobody opens daily. Neither depends on a cycle, so these are asked unconditionally for
+  // anybody who holds a plan at all.
+  const development = useMyDevelopmentPlan(participates)
+  const improvement = useMyImprovementPlan(participates)
+  const planWaiting = planWaitsOnYou(development.data, improvement.data)
+
   // The same list serves both consoles - it returns different rows because the scope is in the
   // SQL, not because the client asks differently - so one query answers both dots. It is read
   // here rather than per screen because the whole point is to reach somebody who has not opened
@@ -109,7 +119,18 @@ function Header({ id, fullName, roles }: { id: number; fullName: string; roles: 
               >
                 Peer reviews
               </Link>
-              <Link to="/my/plan">My plan</Link>
+              <Link
+                to="/my/plan"
+                dot={planWaiting !== null}
+                dotLabel={planWaiting ?? undefined}
+              >
+                My plan
+              </Link>
+              {/*
+                No dot. History is somewhere you go to look back, never somewhere work waits for
+                you - a dot here would be a notification about the past.
+              */}
+              <Link to="/my/history">My history</Link>
             </>
           )}
           {hasRole(roles, 'MANAGER') && (
@@ -117,6 +138,12 @@ function Header({ id, fullName, roles }: { id: number; fullName: string; roles: 
               My team
             </Link>
           )}
+          {/*
+            One link for two consoles, because it is one endpoint. Shown to a manager or an HR
+            user; anybody else who types the URL gets the screen and an empty dashboard, which
+            is what the server returns them rather than a denial.
+          */}
+          {showsReviewLists && <Link to="/dashboard">Dashboard</Link>}
           {hasRole(roles, 'HR') && <Link to="/hr/cycles">Cycles</Link>}
           {hasRole(roles, 'HR') && (
             <Link to="/hr/reviews" dot={hrWaiting} dotLabel="A rating is waiting for sign-off">
@@ -126,6 +153,17 @@ function Header({ id, fullName, roles }: { id: number; fullName: string; roles: 
           {hasRole(roles, 'HR') && <Link to="/hr/improvement-plans">Improvement plans</Link>}
           {hasRole(roles, 'LEADERSHIP') && <Link to="/leadership/metrics">Metrics</Link>}
           {hasRole(roles, 'SUPER_ADMIN') && <Link to="/admin/users">Administration</Link>}
+          {/*
+            Shown to everybody who could be in a review meeting, and that is a wider set than
+            `participates`. Leadership hold no review of their own (P-1.5) but they manage the
+            tier below - the HR Head is reviewed by them under P-2.6 - so they book plan
+            meetings and are invited to normalization ones as somebody's manager. Only the
+            Super Admin is in neither seat and books nothing (P-9.5).
+
+            Cosmetic like the rest of this nav. Every endpoint behind it is about the caller's
+            own account, so there is nothing here for a URL to reach past.
+          */}
+          {!hasRole(roles, 'SUPER_ADMIN') && <Link to="/settings/calendar">Calendar</Link>}
         </nav>
 
         <div className="ml-auto flex items-center gap-3 text-sm">

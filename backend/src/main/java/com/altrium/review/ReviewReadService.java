@@ -82,9 +82,14 @@ public class ReviewReadService {
      * test method.
      */
     @Transactional(readOnly = true)
-    public <T> Page<T> listPermittedReviews(Long cycleId, Pageable pageable,
+    public <T> Page<T> listPermittedReviews(Long cycleId, boolean excludeSelf, Pageable pageable,
                                             Function<ReviewRow, T> mapper) {
         SubjectScope scope = authorization.subjectScopeFor(Capability.READ_REVIEW_SUMMARY);
+        if (excludeSelf) {
+            // Applied to the scope, so it lands in the WHERE clause with every other ground and
+            // the count describes the page. Never a filter over the results (P-0.3).
+            scope = scope.withoutSelf();
+        }
 
         Specification<CycleParticipant> spec =
                 SubjectScopeSpecification.<CycleParticipant>subjectsIn(scope, "subject")

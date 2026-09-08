@@ -1,18 +1,9 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { CycleSelect, useSelectedCycle } from '../../components/CycleSelect'
 import { useLeadershipMetrics, type DepartmentTotals } from '../../api/leadership'
 import { Card, Fact, when } from '../../components/Form'
 import { EmptyState, Loading, QueryFailure } from '../../components/States'
-import { RATINGS, RATING_LABELS } from '../../api/types'
+import { RatingBars } from '../dashboard/RatingBars'
+import { ExportButtons } from '../dashboard/ExportButtons'
 
 /**
  * The Leadership landing screen (P-7.1).
@@ -65,6 +56,13 @@ export function Metrics() {
             <>
               <Distribution distribution={data.ratingDistribution} />
               <Completion departments={data.departments} />
+
+              {/*
+                Leadership export the company totals; HR export their departments from the
+                dashboard. Each control sits beside the report it produces, so what the file
+                covers is what the person is looking at.
+              */}
+              {cycleId !== undefined && <ExportButtons cycleId={cycleId} />}
             </>
           )}
         </div>
@@ -90,47 +88,13 @@ export function Metrics() {
  * the distribution does not make; Leadership are reading how a population is spread, not being
  * told which end is the bad one.
  */
-const RATING_COLOURS: Record<string, string> = {
-  NEEDS_IMPROVEMENT: '#DCA23C',
-  MEETS_EXPECTATIONS: '#A96F14',
-  EXCEEDS_EXPECTATIONS: '#6B4708',
-}
-
 function Distribution({ distribution }: { distribution: Record<string, number> }) {
-  // Built from the scale itself rather than from the keys that happened to arrive, so the
-  // three bars are always the same three bars in the same order. A chart whose axis changed
-  // between cycles would invite comparisons that were not being made.
-  const bars = RATINGS.map((rating) => ({
-    rating,
-    label: RATING_LABELS[rating],
-    total: distribution[rating] ?? 0,
-  }))
-  const rated = bars.reduce((sum, bar) => sum + bar.total, 0)
-
   return (
     <Card title="Ratings across the organisation">
-      {rated === 0 ? (
-        <p className="text-sm text-muted">No ratings have been set in this cycle yet.</p>
-      ) : (
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={bars} barCategoryGap="28%" margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.008 80)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="oklch(0.53 0.015 80)" />
-              <Tooltip
-                cursor={{ fill: 'oklch(0.95 0.006 80)' }}
-                formatter={(value) => [`${Number(value)} people`, 'Rated'] as [string, string]}
-              />
-              <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                {bars.map((bar) => (
-                  <Cell key={bar.rating} fill={RATING_COLOURS[bar.rating]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <RatingBars
+        distribution={distribution}
+        empty="No ratings have been set in this cycle yet."
+      />
     </Card>
   )
 }

@@ -95,6 +95,58 @@ class RatingTest {
                 .andExpect(jsonPath("$.released").value(false));
     }
 
+    /**
+     * Setting the rating is what submits it for sign-off, so it cannot be taken back.
+     *
+     * <p>The window this closes was real: HR could be looking at a figure the manager was still
+     * free to change underneath them, and nothing recorded that it had moved. The calibration
+     * trail answers "who decided this and when", and a rating revised between submission and
+     * sign-off is a decision the trail cannot see.
+     *
+     * <p>409 and not 403. Elena holds {@code SET_FINAL_RATING} on John throughout - she is his
+     * manager and that does not change. It is the record's state that refuses, which is the
+     * same distinction a second peer submission draws.
+     */
+    @Test
+    @DisplayName("P-4.1: the manager cannot change a rating once it is submitted for calibration")
+    void P_4_1_ratingIsFinalOnceSubmittedForCalibration() throws Exception {
+        Department engineering = org.department("Engineering");
+        AppUser elena = org.userIn(engineering, "elena-once", Role.EMPLOYEE, Role.MANAGER);
+        AppUser john = org.userIn(engineering, "john-once", Role.EMPLOYEE);
+        john.setManager(elena);
+        org.flush();
+
+        ReviewCycle cycle = reviews.openCycle();
+        reviews.participant(cycle, john);
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-a-once", Role.EMPLOYEE), "Reliable");
+        reviews.peerReview(cycle, john, org.userIn(engineering, "peer-b-once", Role.EMPLOYEE), "Collaborative");
+        reviews.flush();
+
+        mvc.perform(put(REVIEWS + "/" + john.getId() + "/rating")
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena-once"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rating(Rating.MEETS_EXPECTATIONS)))
+                .andExpect(status().isOk());
+
+        // No HR involvement yet: it is with them, and that alone is what refuses.
+        mvc.perform(put(REVIEWS + "/" + john.getId() + "/rating")
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena-once"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rating(Rating.EXCEEDS_EXPECTATIONS)))
+                .andExpect(status().isConflict());
+
+        // And the refusal actually held - the stored figure is still the one she submitted,
+        // not the one the second call tried to write. Asserted through the record, because a
+        // 409 alone would not catch a version that refused *after* writing.
+        mvc.perform(get(REVIEWS + "/" + john.getId())
+                        .param("cycleId", cycle.getId().toString())
+                        .header("Authorization", bearer("elena-once")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalRating.rating").value("MEETS_EXPECTATIONS"));
+    }
+
     @Test
     @DisplayName("P-4.1: nobody but the subject's own manager sets the rating")
     void P_4_1_onlyTheDirectManagerSetsTheRating() throws Exception {
